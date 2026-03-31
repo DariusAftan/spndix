@@ -1,0 +1,38 @@
+{% extends 'AplicatiePractica/base.html' %}
+{% block titlu %}Înregistrare{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-person-plus"></i> Creează cont</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}
+                                <div class="form-text text-muted">{{ field.help_text }}</div>
+                            {% endif %}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Creează cont
+                    </button>
+                </form>
+                <hr>
+                <p class="text-center mb-0">
+                    Ai deja cont? <a href="/accounts/login/">Autentifică-te</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

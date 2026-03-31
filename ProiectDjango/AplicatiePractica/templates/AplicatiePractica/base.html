@@ -17,8 +17,18 @@
         <div class="ms-auto d-flex align-items-center gap-3">
             {% if user.is_authenticated %}
                 <span class="text-white">Salut, <strong>{{ user.username }}</strong>!</span>
-                <a href="/accounts/logout/" class="btn btn-outline-light btn-sm">
-                    <i class="bi bi-box-arrow-right"></i> Logout
+                <form method="post" action="/accounts/logout/" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                </form>
+            {% else %}
+                <a href="/accounts/login/" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
+                </a>
+                <a href="{% url 'register' %}" class="btn btn-light btn-sm">
+                    <i class="bi bi-person-plus"></i> Register
                 </a>
             {% endif %}
         </div>

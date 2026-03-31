@@ -1,9 +1,9 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Cheltuiala, Categorie
-from .forms import CheltuialaForm
+from .models import Cheltuiala, Categorie   
+from .forms import CheltuialaForm, RegisterForm
 from django.contrib import messages
-
+from django.contrib.auth import login
 
 @login_required
 def lista_cheltuieli(request):
@@ -47,3 +47,17 @@ def sterge_cheltuiala(request, pk):
         messages.success(request, f'Cheltuiala "{cheltuiala.titlu}" a fost ștearsă!')
         return redirect('lista_cheltuieli')
     return render(request, 'AplicatiePractica/confirmare_stergere.html', {'cheltuiala': cheltuiala})
+
+def register(request):
+    if request.user.is_authenticated:
+        return redirect('lista_cheltuieli')
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, f'Cont creat cu succes! Bun venit, {user.username}!')
+            return redirect('lista_cheltuieli')
+    else:
+        form = RegisterForm()
+    return render(request, 'AplicatiePractica/register.html', {'form': form})
