@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('AplicatiePractica', '0001_initial'),
+        ('spndix', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
                 ('data', models.DateField()),
                 ('descriere', models.TextField(blank=True, null=True)),
                 ('creat_la', models.DateTimeField(auto_now_add=True)),
-                ('categorie', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='AplicatiePractica.categorie')),
+                ('categorie', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='spndix.categorie')),
                 ('utilizator', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
             ],
             options={

@@ -1,13 +1,12 @@
-{% extends 'AplicatiePractica/base.html' %}
-
-{% block titlu %}{{ titlu }}{% endblock %}
+{% extends 'spndix/base.html' %}
+{% block titlu %}Înregistrare{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-5">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-pencil-square"></i> {{ titlu }}</h4>
+                <h4 class="mb-0"><i class="bi bi-person-plus"></i> Creează cont</h4>
             </div>
             <div class="card-body">
                 <form method="post">
@@ -16,20 +15,22 @@
                         <div class="mb-3">
                             <label class="form-label fw-semibold">{{ field.label }}</label>
                             {{ field }}
+                            {% if field.help_text %}
+                                <div class="form-text text-muted">{{ field.help_text }}</div>
+                            {% endif %}
                             {% if field.errors %}
                                 <div class="text-danger small">{{ field.errors }}</div>
                             {% endif %}
                         </div>
                     {% endfor %}
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-lg"></i> Salvează
-                        </button>
-                        <a href="{% url 'lista_cheltuieli' %}" class="btn btn-secondary">
-                            <i class="bi bi-x-lg"></i> Anulează
-                        </a>
-                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Creează cont
+                    </button>
                 </form>
+                <hr>
+                <p class="text-center mb-0">
+                    Ai deja cont? <a href="/accounts/login/">Autentifică-te</a>
+                </p>
             </div>
         </div>
     </div>

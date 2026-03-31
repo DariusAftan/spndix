@@ -8,8 +8,7 @@ from django.contrib.auth import login
 @login_required
 def lista_cheltuieli(request):
     cheltuieli = Cheltuiala.objects.filter(utilizator=request.user)
-    return render(request, 'AplicatiePractica/lista.html', {'cheltuieli': cheltuieli})
-
+    return render(request, 'spndix/lista.html', {'cheltuieli': cheltuieli})
 
 @login_required
 def adauga_cheltuiala(request):
@@ -23,8 +22,7 @@ def adauga_cheltuiala(request):
             return redirect('lista_cheltuieli')
     else:
         form = CheltuialaForm()
-    return render(request, 'AplicatiePractica/form.html', {'form': form, 'titlu': 'Adaugă Cheltuială'})
-
+    return render(request, 'spndix/form.html', {'form': form, 'titlu': 'Adaugă Cheltuială'})
 
 @login_required
 def editeaza_cheltuiala(request, pk):
@@ -37,7 +35,7 @@ def editeaza_cheltuiala(request, pk):
             return redirect('lista_cheltuieli')
     else:
         form = CheltuialaForm(instance=cheltuiala)
-    return render(request, 'AplicatiePractica/form.html', {'form': form, 'titlu': 'Editează Cheltuială'})
+    return render(request, 'spndix/form.html', {'form': form, 'titlu': 'Editează Cheltuială'})
 
 @login_required
 def sterge_cheltuiala(request, pk):
@@ -46,7 +44,7 @@ def sterge_cheltuiala(request, pk):
         cheltuiala.delete()
         messages.success(request, f'Cheltuiala "{cheltuiala.titlu}" a fost ștearsă!')
         return redirect('lista_cheltuieli')
-    return render(request, 'AplicatiePractica/confirmare_stergere.html', {'cheltuiala': cheltuiala})
+    return render(request, 'spndix/confirmare_stergere.html', {'cheltuiala': cheltuiala})
 
 def register(request):
     if request.user.is_authenticated:
@@ -60,4 +58,4 @@ def register(request):
             return redirect('lista_cheltuieli')
     else:
         form = RegisterForm()
-    return render(request, 'AplicatiePractica/register.html', {'form': form})
+    return render(request, 'spndix/register.html', {'form': form})

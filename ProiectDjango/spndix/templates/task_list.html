@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lista Cheltuieli - Spndix</title>
+</head>
+<body>
+    <h1>Lista Cheltuieli</h1>
+    <ul>
+        {% for cheltuiala in cheltuieli %}
+            <li>{{ cheltuiala.titlu }} - {{ cheltuiala.descriere }} </li>
+        {% empty %}
+            <li>Nu există cheltuieli.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
