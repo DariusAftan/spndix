@@ -3,11 +3,48 @@
 {% block titlu %}Lista Cheltuieli{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-list-ul"></i> Cheltuielile mele</h2>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-list-ul"></i> Cheltuielile mele</h2>
+        <p class="text-muted mb-0">Filtrează după lună și an, apoi exportă în Excel sau PDF.</p>
+    </div>
     <a href="{% url 'adauga_cheltuiala' %}" class="btn btn-primary">
         <i class="bi bi-plus-lg"></i> Adaugă Cheltuială
     </a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Lună</label>
+                <select name="month" class="form-select">
+                    {% for value, label in luni %}
+                        <option value="{{ value }}" {% if value == luna_selectata %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">An</label>
+                <select name="year" class="form-select">
+                    {% for year in ani_disponibili %}
+                        <option value="{{ year }}" {% if year == an_selectat %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-funnel"></i> Filtrează
+                </button>
+                <a href="{% url 'export_cheltuieli_excel' %}?month={{ luna_selectata }}&year={{ an_selectat }}" class="btn btn-success">
+                    <i class="bi bi-file-earmark-excel"></i> Export Excel
+                </a>
+                <a href="{% url 'export_cheltuieli_pdf' %}?month={{ luna_selectata }}&year={{ an_selectat }}" class="btn btn-danger">
+                    <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                </a>
+            </div>
+        </form>
+    </div>
 </div>
 
 {% if cheltuieli %}
@@ -29,9 +66,11 @@
                         <td>{{ c.titlu }}</td>
                         <td>
                             {% if c.categorie %}
-                                <span class="badge" style="background-color: {{ c.categorie.culoare|default:"#6c757d" }}">
-                                    {{ c.categorie.nume }}
-                                </span>
+                                {% with c.categorie.culoare|default:'#6c757d' as culoare %}
+                                    <span class="badge" style="background-color: {{ culoare }}">
+                                        {{ c.categorie.nume }}
+                                    </span>
+                                {% endwith %}
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}
@@ -64,7 +103,7 @@
 {% else %}
     <div class="text-center py-5">
         <i class="bi bi-inbox display-1 text-muted"></i>
-        <p class="mt-3 text-muted fs-5">Nu ai nicio cheltuială înregistrată încă.</p>
+        <p class="mt-3 text-muted fs-5">Nu ai nicio cheltuială pentru luna selectată.</p>
         <a href="{% url 'adauga_cheltuiala' %}" class="btn btn-primary mt-2">
             <i class="bi bi-plus-lg"></i> Adaugă prima cheltuială
         </a>

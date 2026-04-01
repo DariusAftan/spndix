@@ -1,0 +1,78 @@
+{% extends 'spndix/base.html' %}
+
+{% block titlu %}Bugete{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-piggy-bank"></i> Bugetele mele</h2>
+        <p class="text-muted mb-0">Monitorizează limitele pe categorii și lunile setate.</p>
+    </div>
+    <a href="{% url 'adauga_buget' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Adaugă Buget
+    </a>
+</div>
+
+{% if bugete %}
+    <div class="row g-3">
+        {% for buget in bugete %}
+            <div class="col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                            <div>
+                                <h5 class="card-title mb-1">{{ buget.categorie.nume }}</h5>
+                                <div class="text-muted small">{{ buget.luna_display }} {{ buget.an }}</div>
+                            </div>
+                            {% if buget.excedat %}
+                                <span class="badge bg-danger">Depășit</span>
+                            {% elif buget.procent >= 80 %}
+                                <span class="badge bg-warning text-dark">Aproape de limită</span>
+                            {% else %}
+                                <span class="badge bg-success">În regulă</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>{{ buget.suma_cheltuita|floatformat:2 }} RON cheltuiți</span>
+                            <span>{{ buget.suma_limita|floatformat:2 }} RON limită</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 20px;">
+                            <div class="progress-bar {{ buget.bar_class }}" role="progressbar" style="width: {{ buget.progres }}%;" aria-valuenow="{{ buget.progres }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ buget.procent }}%
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>Rămas: {{ buget.ramas|floatformat:2 }} RON</span>
+                            <span>{{ buget.status }}</span>
+                        </div>
+
+                        {% if buget.excedat %}
+                            <div class="alert alert-danger mt-3 mb-0 py-2 small">
+                                Buget depășit cu {{ buget.depasire|floatformat:2 }} RON.
+                            </div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2 mt-3">
+                            <a href="{% url 'editeaza_buget' buget.id %}" class="btn btn-sm btn-warning">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'sterge_buget' buget.id %}" class="btn btn-sm btn-danger">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-5">
+        <i class="bi bi-piggy-bank display-1 text-muted"></i>
+        <p class="mt-3 text-muted fs-5">Nu ai niciun buget creat încă.</p>
+        <a href="{% url 'adauga_buget' %}" class="btn btn-primary mt-2">
+            <i class="bi bi-plus-lg"></i> Adaugă primul buget
+        </a>
+    </div>
+{% endif %}
+{% endblock %}

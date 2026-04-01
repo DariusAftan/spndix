@@ -18,9 +18,15 @@
                     <button type="submit" class="btn btn-danger">
                         <i class="bi bi-trash"></i> Da, șterge
                     </button>
-                    <a href="{% url 'lista_cheltuieli' %}" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i> Anulează
-                    </a>
+                    {% if back_url %}
+                        <a href="{% url back_url %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Anulează
+                        </a>
+                    {% else %}
+                        <a href="{% url 'lista_cheltuieli' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Anulează
+                        </a>
+                    {% endif %}
                 </form>
             </div>
         </div>

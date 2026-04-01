@@ -1,0 +1,118 @@
+{% extends 'spndix/base.html' %}
+
+{% block titlu %}Analiză AI - Spndix{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-robot"></i> Analiză AI</h2>
+        <p class="text-muted mb-0">Generează o analiză financiară pentru luna selectată cu Claude.</p>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Lună</label>
+                <select name="month" class="form-select">
+                    {% for value, label in luni %}
+                        <option value="{{ value }}" {% if value == luna_selectata %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">An</label>
+                <select name="year" class="form-select">
+                    {% for year in ani_disponibili %}
+                        <option value="{{ year }}" {% if year == an_selectat %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-funnel"></i> Filtrează
+                </button>
+                <a href="{% url 'analiza_ai' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-clockwise"></i> Resetează
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if analiza_exista and analiza %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h5 class="mb-0"><i class="bi bi-robot"></i> Analiză generată</h5>
+                <small class="text-muted">{{ analiza.creat_la|date:"d.m.Y H:i" }}</small>
+            </div>
+            <form method="post" class="m-0">
+                {% csrf_token %}
+                <input type="hidden" name="month" value="{{ luna_selectata }}">
+                <input type="hidden" name="year" value="{{ an_selectat }}">
+                <input type="hidden" name="force" value="1">
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-arrow-repeat"></i> Regenerează
+                </button>
+            </form>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-success d-flex align-items-center gap-2">
+                <i class="bi bi-check-circle-fill"></i>
+                <div>Analiza pentru {{ analiza.get_luna_display }} {{ analiza.an }} este salvată în baza de date.</div>
+            </div>
+            <div class="border rounded-3 p-4 bg-light">
+                <div class="analysis-text">
+                    {{ analiza.continut_analiza|linebreaks }}
+                </div>
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="row g-4 align-items-start">
+                <div class="col-lg-7">
+                    <h5 class="mb-3">Pregătește analiza pentru {{ luna_selectata }}/{{ an_selectat }}</h5>
+                    <p class="text-muted mb-3">
+                        Sistemul va colecta cheltuielile, bugetele și va trimite un prompt către Claude API pentru a genera recomandări financiare personalizate.
+                    </p>
+                    <ul class="list-group list-group-flush mb-3">
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span>Cheltuieli găsite</span>
+                            <strong>{{ cheltuieli_count }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span>Categorii analizate</span>
+                            <strong>{{ categorii_count }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span>Bugete comparate</span>
+                            <strong>{{ bugete_count }}</strong>
+                        </li>
+                    </ul>
+                    <form method="post" class="d-flex gap-2 flex-wrap">
+                        {% csrf_token %}
+                        <input type="hidden" name="month" value="{{ luna_selectata }}">
+                        <input type="hidden" name="year" value="{{ an_selectat }}">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-robot"></i> Generează Analiză
+                        </button>
+                    </form>
+                </div>
+                <div class="col-lg-5">
+                    <div class="alert alert-info mb-0">
+                        <div class="fw-semibold mb-2"><i class="bi bi-info-circle"></i> Ce va include analiza</div>
+                        <p class="mb-2">• categoriile cu cele mai mari cheltuieli</p>
+                        <p class="mb-2">• comparația cu bugetele setate</p>
+                        <p class="mb-2">• sugestii de economisire</p>
+                        <p class="mb-0">• 3 sfaturi concrete pentru luna viitoare</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

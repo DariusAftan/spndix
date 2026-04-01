@@ -1,5 +1,5 @@
 from django import forms
-from .models import Cheltuiala, Categorie
+from .models import Cheltuiala, Categorie, Budget, LUNA_CHOICES
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
@@ -37,4 +37,16 @@ class CategorieForm(forms.ModelForm):
         fields = ['nume', 'descriere', 'culoare']
         widgets = {
             'culoare': forms.TextInput(attrs={'type': 'color'}),
+        }
+
+
+class BudgetForm(forms.ModelForm):
+    class Meta:
+        model = Budget
+        fields = ['categorie', 'suma_limita', 'luna', 'an']
+        widgets = {
+            'categorie': forms.Select(attrs={'class': 'form-select'}),
+            'suma_limita': forms.NumberInput(attrs={'class': 'form-control'}),
+            'luna': forms.Select(choices=LUNA_CHOICES, attrs={'class': 'form-select'}),
+            'an': forms.NumberInput(attrs={'class': 'form-control', 'min': 2000}),
         }
