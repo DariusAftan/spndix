@@ -353,10 +353,14 @@ def scaneaza_bon(request):
                 return redirect('scaneaza_bon')
 
             titlu = request.POST.get('titlu', '').strip() or bon_scan_data.get('titlu_propus', 'Bon scanat')
+            total_text = request.POST.get('total', '').strip()
+            categorie_sugerata_text = request.POST.get('categorie_sugerata', '').strip()
             categorie_id = request.POST.get('categorie') or ''
             categorie = None
             if categorie_id:
                 categorie = Categorie.objects.filter(pk=categorie_id).first()
+            if not categorie and categorie_sugerata_text:
+                categorie = Categorie.objects.filter(nume__iexact=categorie_sugerata_text).first()
             if not categorie and bon_scan_data.get('categorie_initiala_id'):
                 categorie = Categorie.objects.filter(pk=bon_scan_data['categorie_initiala_id']).first()
 
@@ -367,7 +371,10 @@ def scaneaza_bon(request):
                 data_cumpararii = timezone.now().date()
 
             descriere = request.POST.get('descriere', '').strip() or bon_scan_data.get('descriere_propusa', '')
-            suma = Decimal(str(bon_scan_data.get('total', 0))).quantize(Decimal('0.01'))
+            try:
+                suma = Decimal(total_text or str(bon_scan_data.get('total', 0))).quantize(Decimal('0.01'))
+            except Exception:
+                suma = Decimal(str(bon_scan_data.get('total', 0))).quantize(Decimal('0.01'))
 
             cheltuiala = Cheltuiala.objects.create(
                 utilizator=request.user,
@@ -502,6 +509,7 @@ def lista_cheltuieli(request):
     luna_selectata, an_selectat = obtine_filtre_luna_an(request)
 
     cheltuieli_filtrate = cheltuieli.filter(data__month=luna_selectata, data__year=an_selectat)
+    total_cheltuit = cheltuieli_filtrate.aggregate(total=Sum('suma'))['total'] or 0
     ani_disponibili = sorted(
         set(
             Cheltuiala.objects.filter(utilizator=request.user).dates('data', 'year')
@@ -514,6 +522,7 @@ def lista_cheltuieli(request):
 
     context = {
         'cheltuieli': cheltuieli_filtrate,
+        'total_cheltuit': total_cheltuit,
         'luna_selectata': luna_selectata,
         'an_selectat': an_selectat,
         'luni': LUNA_CHOICES,

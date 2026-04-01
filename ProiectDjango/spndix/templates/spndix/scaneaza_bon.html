@@ -12,7 +12,7 @@
 
 <div class="card shadow-sm mb-4">
     <div class="card-body">
-        <form method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+        <form method="post" enctype="multipart/form-data" class="row g-3 align-items-end" id="uploadReceiptForm">
             {% csrf_token %}
             <input type="hidden" name="action" value="analizeaza">
             <div class="col-md-8">
@@ -76,41 +76,78 @@
                     </div>
 
                     <div class="table-responsive mb-3">
-                        <table class="table table-sm table-hover align-middle">
+                        <table class="table table-sm align-middle" id="produseTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Produs</th>
-                                    <th class="text-end">Preț</th>
+                                    <th style="min-width: 280px;">Produs</th>
+                                    <th style="width: 180px;">Preț</th>
+                                    <th style="width: 70px;" class="text-center">Șterge</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="produseTbody">
                                 {% for produs in bon_scan.produse %}
-                                    <tr>
-                                        <td>{{ produs.nume }}</td>
-                                        <td class="text-end">{{ produs.pret|floatformat:2 }} RON</td>
+                                    <tr class="produs-row">
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm produs-nume" value="{{ produs.nume|default:'' }}" placeholder="Nume produs">
+                                        </td>
+                                        <td>
+                                            <input type="number" step="0.01" min="0" class="form-control form-control-sm produs-pret text-end" value="{{ produs.pret|default:0 }}" placeholder="0.00">
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-produs" aria-label="Șterge produsul">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </td>
                                     </tr>
                                 {% empty %}
-                                    <tr>
-                                        <td colspan="2" class="text-center text-muted py-3">Nu au fost extrase produse individuale.</td>
+                                    <tr class="produs-row">
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm produs-nume" value="" placeholder="Nume produs">
+                                        </td>
+                                        <td>
+                                            <input type="number" step="0.01" min="0" class="form-control form-control-sm produs-pret text-end" value="0.00" placeholder="0.00">
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-produs" aria-label="Șterge produsul">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
 
-                    <form method="post" class="row g-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <button type="button" class="btn btn-outline-primary" id="adaugaProdusBtn">
+                            <i class="bi bi-plus-circle"></i> Adaugă produs
+                        </button>
+                        <div class="fw-semibold">
+                            Total calculat: <span class="text-danger" id="totalCalculat">{{ bon_scan.total|floatformat:2 }}</span> RON
+                        </div>
+                    </div>
+
+                    <form method="post" class="row g-3" id="saveReceiptForm">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="salveaza">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Titlu cheltuială</label>
-                            <input type="text" name="titlu" class="form-control" value="{{ bon_scan.titlu_propus }}" required>
+                            <label class="form-label fw-semibold">Magazin / Titlu cheltuială</label>
+                            <input type="text" name="titlu" class="form-control" value="{{ bon_scan.magazin|default:bon_scan.titlu_propus }}" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-semibold">Data</label>
                             <input type="date" name="data_cumpararii" class="form-control" value="{{ bon_scan.data_cumpararii }}">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Categorie</label>
+                            <label class="form-label fw-semibold">Total</label>
+                            <input type="number" step="0.01" name="total" class="form-control" value="{{ bon_scan.total }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Categorie sugerată</label>
+                            <input type="text" name="categorie_sugerata" class="form-control" value="{{ bon_scan.categorie_sugerata }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Categorie finală</label>
                             <select name="categorie" class="form-select">
                                 <option value="">Selectează</option>
                                 {% for categorie in categorii %}
@@ -122,7 +159,7 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">Descriere</label>
-                            <textarea name="descriere" class="form-control" rows="6">{{ bon_scan.descriere_propusa }}</textarea>
+                            <textarea name="descriere" id="descriereBon" class="form-control" rows="8">{{ bon_scan.descriere_propusa }}</textarea>
                         </div>
                         <div class="col-12 d-flex gap-2 flex-wrap">
                             <button type="submit" class="btn btn-success">
@@ -152,4 +189,121 @@
         </div>
     </div>
 {% endif %}
+
+    <template id="produsRowTemplate">
+        <tr class="produs-row">
+            <td>
+                <input type="text" class="form-control form-control-sm produs-nume" value="" placeholder="Nume produs">
+            </td>
+            <td>
+                <input type="number" step="0.01" min="0" class="form-control form-control-sm produs-pret text-end" value="0.00" placeholder="0.00">
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger btn-remove-produs" aria-label="Șterge produsul">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </td>
+        </tr>
+    </template>
+
+    <script>
+        (function () {
+            const tbody = document.getElementById('produseTbody');
+            const totalDisplay = document.getElementById('totalCalculat');
+            const addButton = document.getElementById('adaugaProdusBtn');
+            const descriptionField = document.getElementById('descriereBon');
+            const titleField = document.querySelector('input[name="titlu"]');
+            const originalMagazin = "{{ bon_scan.magazin|default_if_none:''|escapejs }}";
+            const saveForm = document.getElementById('saveReceiptForm');
+
+            function getRows() {
+                return Array.from(tbody.querySelectorAll('.produs-row'));
+            }
+
+            function calculateTotal() {
+                let total = 0;
+                getRows().forEach((row) => {
+                    const priceInput = row.querySelector('.produs-pret');
+                    const price = parseFloat(priceInput.value || '0');
+                    if (!Number.isNaN(price)) {
+                        total += price;
+                    }
+                });
+                totalDisplay.textContent = total.toFixed(2);
+                return total;
+            }
+
+            function buildDescription() {
+                const lines = [];
+                const magazineValue = (titleField.value || originalMagazin || '—').trim();
+                lines.push('Bon scanat automat.');
+                lines.push(`Magazin: ${magazineValue}`);
+                lines.push('Produse:');
+
+                getRows().forEach((row) => {
+                    const nameInput = row.querySelector('.produs-nume');
+                    const priceInput = row.querySelector('.produs-pret');
+                    const name = (nameInput.value || '').trim();
+                    const price = parseFloat(priceInput.value || '0');
+                    if (name || !Number.isNaN(price)) {
+                        lines.push(`- ${name || 'Produs'}: ${Number.isNaN(price) ? '0.00' : price.toFixed(2)} RON`);
+                    }
+                });
+
+                lines.push(`Total: ${calculateTotal().toFixed(2)} RON`);
+                descriptionField.value = lines.join('\n');
+            }
+
+            function bindRow(row) {
+                const priceInput = row.querySelector('.produs-pret');
+                const nameInput = row.querySelector('.produs-nume');
+                const removeButton = row.querySelector('.btn-remove-produs');
+
+                priceInput.addEventListener('input', () => {
+                    calculateTotal();
+                    buildDescription();
+                });
+
+                nameInput.addEventListener('input', buildDescription);
+
+                removeButton.addEventListener('click', () => {
+                    const rows = getRows();
+                    if (rows.length > 1) {
+                        row.remove();
+                    } else {
+                        nameInput.value = '';
+                        priceInput.value = '0.00';
+                    }
+                    calculateTotal();
+                    buildDescription();
+                });
+            }
+
+            function addRow() {
+                const template = document.getElementById('produsRowTemplate');
+                const clone = template.content.cloneNode(true);
+                const row = clone.querySelector('.produs-row');
+                tbody.appendChild(clone);
+                bindRow(row);
+                calculateTotal();
+                buildDescription();
+            }
+
+            getRows().forEach(bindRow);
+
+            addButton.addEventListener('click', addRow);
+
+            titleField.addEventListener('input', buildDescription);
+            descriptionField.addEventListener('focus', () => {
+                if (!descriptionField.value.trim()) {
+                    buildDescription();
+                }
+            });
+
+            saveForm.addEventListener('submit', buildDescription);
+
+            calculateTotal();
+            buildDescription();
+        })();
+    </script>
 {% endblock %}
