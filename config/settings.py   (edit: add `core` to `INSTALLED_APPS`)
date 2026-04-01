@@ -1,6 +1,0 @@
-INSTALLED_APPS = [
-    ...
-    'core',
-]
-
-# Other settings remain unchanged.

@@ -192,6 +192,32 @@ def construieste_prompt_analiza(luna, an, date_cheltuieli, date_bugete):
     )
 
 
+def genereaza_text_gemini(prompt):
+    modele_candidate = (
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-lite',
+        'gemini-flash-lite-latest',
+        'gemini-1.5-flash-latest',
+    )
+    ultima_eroare = None
+
+    for model_name in modele_candidate:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            raspuns = (response.text or '').strip()
+            if raspuns:
+                return raspuns
+            ultima_eroare = RuntimeError(f'Modelul {model_name} a returnat răspuns gol.')
+        except Exception as exc:
+            ultima_eroare = exc
+
+    raise RuntimeError(
+        'Nu am găsit un model Gemini compatibil pentru analiză. '
+        f'Ultima eroare: {ultima_eroare}'
+    )
+
+
 def construieste_descriere_bon(produse, magazin, data_cumpararii, categorie_sugerata):
     linii = [f"{produs.get('nume', 'Produs')}: {float(produs.get('pret', 0)):.2f} RON" for produs in produse]
     bloc_produse = "\n".join(f"- {linie}" for linie in linii) if linii else "- Nu au fost extrase produse individuale."
@@ -407,9 +433,7 @@ def genereaza_analiza_ai(request, luna, an, force=False):
     prompt = construieste_prompt_analiza(luna, an, date_cheltuieli_text, date_bugete_text)
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    response = model.generate_content(prompt)
-    analysis_text = (response.text or '').strip()
+    analysis_text = genereaza_text_gemini(prompt)
 
     if existing:
         existing.continut_analiza = analysis_text
