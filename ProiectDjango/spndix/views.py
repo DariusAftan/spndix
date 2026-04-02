@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Cheltuiala, Categorie, Budget, AIAnaliza, LUNA_CHOICES
-from .forms import CheltuialaForm, RegisterForm, BudgetForm
+from .models import Cheltuiala, Categorie, Budget, AIAnaliza, UserProfile, LUNA_CHOICES
+from .forms import CheltuialaForm, RegisterForm, BudgetForm, UserProfileForm
 from django.contrib import messages
 from django.contrib.auth import login
 from django.db.models import Sum
@@ -177,19 +177,119 @@ def rezumat_cheltuieli_ai(request, luna, an):
     return date_cheltuieli_text, date_bugete_text, cheltuieli, totaluri_categorii, bugete_detaliate
 
 
-def construieste_prompt_analiza(luna, an, date_cheltuieli, date_bugete):
-    return (
-        "Ești un asistent financiar personal. Analizează cheltuielile acestui utilizator "
-        f"pentru luna {luna_display(luna)} {an}:\n"
-        f"{date_cheltuieli}\n"
-        f"Bugete setate: {date_bugete}\n"
-        "Te rog să:\n"
-        "1. Identifici categoriile unde s-a cheltuit cel mai mult\n"
-        "2. Compari cheltuielile cu bugetele setate\n"
-        "3. Sugerezi unde s-ar fi putut economisi\n"
-        "4. Dai 3 sfaturi concrete pentru luna viitoare\n"
-        "Răspunde în română, într-un mod prietenos și constructiv."
+def construieste_cheltuieli_detaliate(cheltuieli):
+    linii = []
+    for item in cheltuieli:
+        categorie = item.categorie.nume if item.categorie else 'Fără categorie'
+        linii.append(
+            f"- [{item.data.strftime('%d.%m.%Y')}] {item.titlu} ({categorie}): {float(item.suma):.2f} RON"
+        )
+    return "\n".join(linii) if linii else "Nu există cheltuieli înregistrate pentru perioada selectată."
+
+
+def obtine_luna_precedenta(luna, an):
+    if luna == 1:
+        return 12, an - 1
+    return luna - 1, an
+
+
+def construieste_date_luna_precedenta(utilizator, luna, an):
+    luna_precedenta, an_precedent = obtine_luna_precedenta(luna, an)
+    cheltuieli_precedente = Cheltuiala.objects.filter(
+        utilizator=utilizator,
+        data__month=luna_precedenta,
+        data__year=an_precedent,
+    ).select_related('categorie').order_by('-data', '-id')
+
+    cheltuieli_text = construieste_cheltuieli_detaliate(cheltuieli_precedente)
+    totaluri_categorii = list(
+        cheltuieli_precedente.values('categorie__nume')
+        .annotate(total=Sum('suma'))
+        .order_by('-total')
     )
+
+    if totaluri_categorii:
+        totaluri_text = "\n".join(
+            f"- {(item['categorie__nume'] or 'Fără categorie')}: {float(item['total']):.2f} RON"
+            for item in totaluri_categorii
+        )
+    else:
+        totaluri_text = "- Fără date"
+
+    return (
+        f"Luna precedentă analizată: {luna_display(luna_precedenta)} {an_precedent}\n"
+        f"Cheltuieli detaliate:\n{cheltuieli_text}\n\n"
+        "Totaluri pe categorii:\n"
+        f"{totaluri_text}"
+    )
+
+
+def construieste_prompt_analiza(
+    luna,
+    an,
+    tip_gospodarie,
+    nr_persoane,
+    are_copii,
+    venit_lunar,
+    obiectiv,
+    date_cheltuieli_detaliate,
+    date_bugete,
+    date_luna_precedenta,
+):
+    return f"""
+Ești un consilier financiar personal experimentat,
+nu un chatbot generic. Analizezi cheltuielile reale
+ale unui utilizator și dai sfaturi SPECIFICE bazate
+EXCLUSIV pe datele lui, nu sfaturi generale.
+
+CONTEXT UTILIZATOR:
+- Tip gospodărie: {tip_gospodarie}
+- Număr persoane în gospodărie: {nr_persoane}
+- Are copii: {are_copii}
+- Venit lunar aproximativ: {venit_lunar} RON
+- Obiectiv financiar: {obiectiv}
+
+CHELTUIELI LUNA {luna} {an}:
+{date_cheltuieli_detaliate}
+
+BUGETE SETATE:
+{date_bugete}
+
+CHELTUIELI LUNA PRECEDENTĂ (pentru comparație):
+{date_luna_precedenta}
+
+REGULI STRICTE:
+1. NU da sfaturi generice - doar sfaturi bazate
+   pe datele CONCRETE ale acestui utilizator
+2. Calculează cheltuielile per persoană din
+   gospodărie unde e relevant
+3. Compară cu luna precedentă și identifică
+   ce a crescut/scăzut
+4. Identifică anomalii specifice cu sume exacte
+5. Sfaturile trebuie să fie ACȚIONABILE cu sume exacte:
+   NU: "Reduce cheltuielile pe divertisment"
+   DA: "Ai plătit Netflix (45 RON) + HBO (35 RON) =
+       80 RON. Dacă împarți Netflix cu cineva
+       economisești 45 RON/lună = 540 RON/an"
+6. Dacă sunt sub 10 cheltuieli introduse, menționează
+   că analiza e limitată și îndeamnă să adauge mai multe
+7. Ține cont de contextul familial - nu sugera reducerea
+   cheltuielilor esențiale pentru familie dacă sunt
+   rezonabile per persoană
+8. Tonul să fie ca al unui prieten care ajută,
+   nu ca un profesor care ceartă
+
+STRUCTURĂ RĂSPUNS (respectă exact această structură):
+1. Sumar luna {luna} {an} (3-4 rânduri cu totaluri exacte)
+2. Top 3 categorii cu cele mai mari cheltuieli
+   (sume exacte + comparație cu luna precedentă)
+3. O anomalie sau pattern interesant observat în date
+4. 3 sfaturi SPECIFICE și ACȚIONABILE cu sume exacte
+5. Estimare economii: dacă urmezi sfaturile,
+   cât poți economisi luna viitoare?
+
+Răspunde în română, prietenos și direct.
+"""
 
 
 def genereaza_text_gemini(prompt):
@@ -429,8 +529,43 @@ def genereaza_analiza_ai(request, luna, an, force=False):
     if not settings.GEMINI_API_KEY:
         raise RuntimeError('Lipsește cheia GEMINI_API_KEY din .env')
 
-    date_cheltuieli_text, date_bugete_text, _, _, _ = rezumat_cheltuieli_ai(request, luna, an)
-    prompt = construieste_prompt_analiza(luna, an, date_cheltuieli_text, date_bugete_text)
+    _, date_bugete_text, _, _, _ = rezumat_cheltuieli_ai(request, luna, an)
+
+    try:
+        profil = request.user.userprofile
+        tip_gospodarie = profil.get_tip_gospodarie_display()
+        nr_persoane = profil.nr_persoane
+        are_copii = "Da" if profil.are_copii else "Nu"
+        venit_lunar = profil.venit_lunar or "Nespecificat"
+        obiectiv = profil.get_obiectiv_display()
+    except UserProfile.DoesNotExist:
+        tip_gospodarie = "Nespecificat"
+        nr_persoane = 1
+        are_copii = "Nu"
+        venit_lunar = "Nespecificat"
+        obiectiv = "Nespecificat"
+
+    cheltuieli_luna = Cheltuiala.objects.filter(
+        utilizator=request.user,
+        data__month=luna,
+        data__year=an,
+    ).select_related('categorie').order_by('-data', '-id')
+
+    date_cheltuieli_detaliate = construieste_cheltuieli_detaliate(cheltuieli_luna)
+    date_luna_precedenta = construieste_date_luna_precedenta(request.user, luna, an)
+
+    prompt = construieste_prompt_analiza(
+        luna=luna_display(luna),
+        an=an,
+        tip_gospodarie=tip_gospodarie,
+        nr_persoane=nr_persoane,
+        are_copii=are_copii,
+        venit_lunar=venit_lunar,
+        obiectiv=obiectiv,
+        date_cheltuieli_detaliate=date_cheltuieli_detaliate,
+        date_bugete=date_bugete_text,
+        date_luna_precedenta=date_luna_precedenta,
+    )
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
     analysis_text = genereaza_text_gemini(prompt)
@@ -455,19 +590,16 @@ def dashboard(request):
     luna_curenta = azi.month
     an_curent = azi.year
 
-    # Total luna curenta
     total_luna = Cheltuiala.objects.filter(
         utilizator=request.user,
         data__month=luna_curenta,
         data__year=an_curent
     ).aggregate(total=Sum('suma'))['total'] or 0
 
-    # Total general
     total_general = Cheltuiala.objects.filter(
         utilizator=request.user
     ).aggregate(total=Sum('suma'))['total'] or 0
 
-    # Ultimele 5 cheltuieli
     ultimele_cheltuieli = Cheltuiala.objects.filter(
         utilizator=request.user
     )[:5]
@@ -481,7 +613,6 @@ def dashboard(request):
     bugete_dashboard = [construieste_buget_dashboard(buget, request.user) for buget in bugete_curente]
     bugete_depasite = [buget for buget in bugete_dashboard if buget['excedat']]
 
-    # Date pentru grafic pie - cheltuieli pe categorii (luna curenta)
     categorii_data = Cheltuiala.objects.filter(
         utilizator=request.user,
         data__month=luna_curenta,
@@ -491,7 +622,6 @@ def dashboard(request):
     pie_labels = [item['categorie__nume'] or 'Fără categorie' for item in categorii_data]
     pie_data = [float(item['total']) for item in categorii_data]
 
-    # Date pentru grafic bar - ultimele 6 luni
     bar_labels = []
     bar_data = []
     for i in range(5, -1, -1):
@@ -558,6 +688,12 @@ def lista_cheltuieli(request):
 @login_required
 def analiza_ai(request):
     luna_selectata, an_selectat = obtine_filtre_luna_an(request)
+    cheltuieli_count = Cheltuiala.objects.filter(
+        utilizator=request.user,
+        data__month=luna_selectata,
+        data__year=an_selectat,
+    ).count()
+    warning_date_insuficiente = cheltuieli_count < 10
 
     if request.method == 'POST':
         luna_selectata = int(request.POST.get('month', luna_selectata))
@@ -592,6 +728,8 @@ def analiza_ai(request):
             'analiza': analiza,
             'analiza_exista': True,
             'creata_azi': False,
+            'cheltuieli_count': cheltuieli_count,
+            'warning_date_insuficiente': warning_date_insuficiente,
         }
     else:
         date_cheltuieli_text, date_bugete_text, cheltuieli, totaluri_categorii, bugete_detaliate = rezumat_cheltuieli_ai(request, luna_selectata, an_selectat)
@@ -608,6 +746,7 @@ def analiza_ai(request):
             'cheltuieli_count': cheltuieli.count(),
             'categorii_count': len(totaluri_categorii),
             'bugete_count': len(bugete_detaliate),
+            'warning_date_insuficiente': warning_date_insuficiente,
         }
 
     return render(request, 'spndix/analiza.html', context)
@@ -827,6 +966,23 @@ def sterge_buget(request, pk):
         messages.success(request, 'Bugetul a fost șters!')
         return redirect('lista_bugete')
     return render(request, 'spndix/confirmare_stergere.html', {'cheltuiala': buget, 'back_url': 'lista_bugete'})
+
+
+@login_required
+def profil(request):
+    profil_user, _ = UserProfile.objects.get_or_create(utilizator=request.user)
+
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, instance=profil_user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profilul a fost salvat cu succes.')
+            return redirect('profil')
+    else:
+        form = UserProfileForm(instance=profil_user)
+
+    return render(request, 'spndix/profil.html', {'form': form})
+
 
 def register(request):
     if request.user.is_authenticated:

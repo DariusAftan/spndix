@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 LUNA_CHOICES = [
@@ -18,10 +20,49 @@ LUNA_CHOICES = [
 ]
 
 
+TIP_GOSPODARIE_CHOICES = [
+    ('single', 'Single'),
+    ('cuplu', 'Cuplu'),
+    ('familie_copii', 'Familie cu copii'),
+    ('colegi_casa', 'Colegi de casă'),
+]
+
+
+OBIECTIV_CHOICES = [
+    ('economisire', 'Economisire'),
+    ('stabilitate', 'Stabilitate'),
+    ('investitii', 'Investiții'),
+    ('iesire_datorii', 'Ieșire din datorii'),
+]
+
+
+class UserProfile(models.Model):
+    utilizator = models.OneToOneField(User, on_delete=models.CASCADE)
+    tip_gospodarie = models.CharField(max_length=20, choices=TIP_GOSPODARIE_CHOICES, default='single')
+    nr_persoane = models.IntegerField(default=1)
+    are_copii = models.BooleanField(default=False)
+    venit_lunar = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    obiectiv = models.CharField(max_length=20, choices=OBIECTIV_CHOICES, default='stabilitate')
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Profil {self.utilizator.username}"
+
+    class Meta:
+        verbose_name = 'Profil utilizator'
+        verbose_name_plural = 'Profiluri utilizatori'
+
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.create(utilizator=instance)
+
+
 class Categorie(models.Model):
     nume = models.CharField(max_length=100)
     descriere = models.TextField(blank=True, null=True)
-    culoare = models.CharField(max_length=7, default='#3498db')  # hex color
+    culoare = models.CharField(max_length=7, default='#3498db')
 
     def __str__(self):
         return self.nume

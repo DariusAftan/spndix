@@ -1,5 +1,5 @@
 from django import forms
-from .models import Cheltuiala, Categorie, Budget, LUNA_CHOICES
+from .models import Cheltuiala, Categorie, Budget, LUNA_CHOICES, UserProfile
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
@@ -49,4 +49,17 @@ class BudgetForm(forms.ModelForm):
             'suma_limita': forms.NumberInput(attrs={'class': 'form-control'}),
             'luna': forms.Select(choices=LUNA_CHOICES, attrs={'class': 'form-select'}),
             'an': forms.NumberInput(attrs={'class': 'form-control', 'min': 2000}),
+        }
+
+
+class UserProfileForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ['tip_gospodarie', 'nr_persoane', 'are_copii', 'venit_lunar', 'obiectiv']
+        widgets = {
+            'tip_gospodarie': forms.Select(attrs={'class': 'form-select'}),
+            'nr_persoane': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'are_copii': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'venit_lunar': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
+            'obiectiv': forms.Select(attrs={'class': 'form-select'}),
         }

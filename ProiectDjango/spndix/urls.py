@@ -15,5 +15,6 @@ urlpatterns = [
     path('bugete/adauga/', views.adauga_buget, name='adauga_buget'),
     path('bugete/editeaza/<int:pk>/', views.editeaza_buget, name='editeaza_buget'),
     path('bugete/sterge/<int:pk>/', views.sterge_buget, name='sterge_buget'),
+    path('profil/', views.profil, name='profil'),
     path('register/', views.register, name='register'), 
 ]
