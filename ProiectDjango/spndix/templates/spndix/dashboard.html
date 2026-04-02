@@ -152,7 +152,7 @@
                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
                         <div>
                             <div class="fw-semibold">{{ buget.categorie.nume }}</div>
-                            <div class="small text-muted">{{ buget.luna_display }} {{ buget.an }}</div>
+                            <div class="small text-body-secondary">{{ buget.luna_display }} {{ buget.an }}</div>
                         </div>
                         <div class="text-end">
                             <div class="fw-semibold">{{ buget.suma_cheltuita|floatformat:2 }} / {{ buget.suma_limita|floatformat:2 }} RON</div>
@@ -165,7 +165,7 @@
                 </div>
             {% endfor %}
         {% else %}
-            <div class="text-center py-4 text-muted">
+            <div class="text-center py-4 text-body-secondary">
                 <i class="bi bi-piggy-bank fs-2"></i>
                 <p class="mb-0 mt-2">Nu ai încă bugete pentru luna curentă.</p>
             </div>
@@ -183,7 +183,7 @@
                 {% if pie_labels and pie_data %}
                     <canvas id="pieChart" height="250"></canvas>
                 {% else %}
-                    <div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-2"></i><p class="mb-0 mt-2">Nu există date pentru luna curentă.</p></div>
+                    <div class="text-center py-5 text-body-secondary"><i class="bi bi-inbox fs-2"></i><p class="mb-0 mt-2">Nu există date pentru luna curentă.</p></div>
                 {% endif %}
             </div>
         </div>
@@ -236,18 +236,18 @@
                     {% endif %}
                     <div>
                         <div class="fw-semibold">{{ c.titlu }}</div>
-                        <div class="text-muted small">{{ c.categorie.nume|default:'Fără categorie' }}</div>
+                        <div class="text-body-secondary small">{{ c.categorie.nume|default:'Fără categorie' }}</div>
                     </div>
                 </div>
                 <div class="text-end">
                     <div class="amount" style="color: var(--danger);">-{{ c.suma|floatformat:2 }} RON</div>
-                    <div class="small text-muted">{{ c.data|date:'d.m.Y' }}</div>
+                    <div class="small text-body-secondary">{{ c.data|date:'d.m.Y' }}</div>
                 </div>
             </div>
         </div>
         {% endwith %}
     {% empty %}
-        <div class="text-center py-4 text-muted">
+        <div class="text-center py-4 text-body-secondary">
             <i class="bi bi-inbox fs-2"></i>
             <p class="mb-0 mt-2">Nu există cheltuieli înregistrate.</p>
         </div>

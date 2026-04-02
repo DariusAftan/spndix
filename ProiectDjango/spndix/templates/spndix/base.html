@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ro">
 <head>
@@ -9,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{% static 'spndix/images/logo.png' %}">
     <style>
         :root {
             --bg-primary: #ffffff;
@@ -30,7 +32,7 @@
             --nav-height: 78px;
         }
 
-        [data-theme="dark"] {
+        [data-bs-theme="dark"] {
             --bg-primary: #0f172a;
             --bg-secondary: #1e293b;
             --bg-card: #1e293b;
@@ -73,39 +75,57 @@
             min-height: var(--nav-height);
         }
 
-        [data-theme="dark"] .glass-navbar {
+        [data-bs-theme="dark"] .glass-navbar {
             background: rgba(15,23,42,0.9);
         }
 
-        [data-theme="dark"] * {
+        [data-bs-theme="dark"] * {
             color: inherit;
         }
 
-        [data-theme="dark"] .card,
-        [data-theme="dark"] .card-header,
-        [data-theme="dark"] .card-body {
+        [data-bs-theme="dark"] .card,
+        [data-bs-theme="dark"] .card-header,
+        [data-bs-theme="dark"] .card-body {
             color: #f1f5f9 !important;
         }
 
-        [data-theme="dark"] .text-muted,
-        [data-theme="dark"] small,
-        [data-theme="dark"] .card-subtitle {
+        [data-bs-theme="dark"] .text-muted,
+        [data-bs-theme="dark"] small,
+        [data-bs-theme="dark"] .card-subtitle {
             color: #94a3b8 !important;
         }
 
-        [data-theme="dark"] h1,
-        [data-theme="dark"] h2,
-        [data-theme="dark"] h3,
-        [data-theme="dark"] h4,
-        [data-theme="dark"] h5,
-        [data-theme="dark"] h6 {
+        [data-bs-theme="dark"] h1,
+        [data-bs-theme="dark"] h2,
+        [data-bs-theme="dark"] h3,
+        [data-bs-theme="dark"] h4,
+        [data-bs-theme="dark"] h5,
+        [data-bs-theme="dark"] h6 {
             color: #f1f5f9 !important;
         }
 
-        [data-theme="dark"] p,
-        [data-theme="dark"] span,
-        [data-theme="dark"] label {
+        [data-bs-theme="dark"] p,
+        [data-bs-theme="dark"] span,
+        [data-bs-theme="dark"] label {
             color: #cbd5e1 !important;
+        }
+
+        [data-bs-theme="dark"] .dropdown-menu {
+            background-color: #1e293b;
+            border-color: #334155;
+        }
+
+        [data-bs-theme="dark"] .dropdown-item {
+            color: #f1f5f9;
+        }
+
+        [data-bs-theme="dark"] .dropdown-item:hover {
+            background-color: #334155;
+            color: #f1f5f9;
+        }
+
+        [data-bs-theme="dark"] .dropdown-divider {
+            border-color: #334155;
         }
 
         .glass-navbar.navbar-scrolled {
@@ -288,14 +308,20 @@
         }
 
         .theme-toggle {
-            width: 42px;
-            height: 42px;
+            width: 38px;
+            height: 38px;
             border: 1px solid var(--border);
             background: var(--bg-card);
             color: var(--text-primary);
             border-radius: 50%;
             display: inline-grid;
             place-items: center;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .theme-toggle i {
+            font-size: 1rem;
         }
 
         .fade-in { animation: fadeInUp 0.4s ease forwards; }
@@ -361,17 +387,17 @@
         .cat-subscriptions { background:#ede9fe; color:#7c3aed; }
         .cat-other { background:#f1f5f9; color:#64748b; }
 
-        [data-theme="dark"] .cat-food { background: rgba(22,163,74,.2); color:#86efac; }
-        [data-theme="dark"] .cat-transport { background: rgba(37,99,235,.2); color:#93c5fd; }
-        [data-theme="dark"] .cat-health { background: rgba(220,38,38,.2); color:#fca5a5; }
-        [data-theme="dark"] .cat-entertainment { background: rgba(147,51,234,.2); color:#d8b4fe; }
-        [data-theme="dark"] .cat-clothing { background: rgba(234,88,12,.2); color:#fdba74; }
-        [data-theme="dark"] .cat-utilities { background: rgba(202,138,4,.2); color:#fde68a; }
-        [data-theme="dark"] .cat-education { background: rgba(2,132,199,.2); color:#7dd3fc; }
-        [data-theme="dark"] .cat-savings { background: rgba(21,128,61,.2); color:#86efac; }
-        [data-theme="dark"] .cat-dining { background: rgba(219,39,119,.2); color:#f9a8d4; }
-        [data-theme="dark"] .cat-subscriptions { background: rgba(124,58,237,.2); color:#c4b5fd; }
-        [data-theme="dark"] .cat-other { background: rgba(100,116,139,.25); color:#cbd5e1; }
+        [data-bs-theme="dark"] .cat-food { background: rgba(22,163,74,.2); color:#86efac; }
+        [data-bs-theme="dark"] .cat-transport { background: rgba(37,99,235,.2); color:#93c5fd; }
+        [data-bs-theme="dark"] .cat-health { background: rgba(220,38,38,.2); color:#fca5a5; }
+        [data-bs-theme="dark"] .cat-entertainment { background: rgba(147,51,234,.2); color:#d8b4fe; }
+        [data-bs-theme="dark"] .cat-clothing { background: rgba(234,88,12,.2); color:#fdba74; }
+        [data-bs-theme="dark"] .cat-utilities { background: rgba(202,138,4,.2); color:#fde68a; }
+        [data-bs-theme="dark"] .cat-education { background: rgba(2,132,199,.2); color:#7dd3fc; }
+        [data-bs-theme="dark"] .cat-savings { background: rgba(21,128,61,.2); color:#86efac; }
+        [data-bs-theme="dark"] .cat-dining { background: rgba(219,39,119,.2); color:#f9a8d4; }
+        [data-bs-theme="dark"] .cat-subscriptions { background: rgba(124,58,237,.2); color:#c4b5fd; }
+        [data-bs-theme="dark"] .cat-other { background: rgba(100,116,139,.25); color:#cbd5e1; }
 
         @media (max-width: 991.98px) {
             .desktop-nav,
@@ -402,7 +428,7 @@
                 </button>
                 <a class="navbar-brand d-flex align-items-center gap-2 m-0" href="{% url 'dashboard' %}">
                     <span class="brand-mark"><i class="bi bi-wallet2"></i></span>
-                    <span class="brand-text">Spndix</span>
+                    <img src="{% static 'spndix/images/logo.png' %}" alt="Spndix" height="35">
                 </a>
             </div>
 
@@ -415,7 +441,7 @@
                 </ul>
 
                 <div class="desktop-user-actions d-flex align-items-center gap-2">
-                    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+                    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
                         <i class="bi bi-moon-stars"></i>
                     </button>
 
@@ -443,7 +469,7 @@
                 </div>
             {% else %}
                 <div class="d-flex gap-2 ms-auto">
-                    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+                    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
                         <i class="bi bi-moon-stars"></i>
                     </button>
                     <a href="/accounts/login/" class="btn btn-outline-dark"><i class="bi bi-box-arrow-in-right me-1"></i>Login</a>
@@ -468,7 +494,9 @@
         <a class="btn btn-light text-start mb-2" href="{% url 'analiza_ai' %}"><i class="bi bi-robot me-2"></i>Analiză AI</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'profil' %}"><i class="bi bi-person-gear me-2"></i>Profil</a>
         <a class="btn btn-light text-start mb-4" href="{% url 'scaneaza_bon' %}"><i class="bi bi-upc-scan me-2"></i>Scanează bon</a>
-        <button id="themeToggleMobile" class="btn btn-outline-dark mb-3" type="button"><i class="bi bi-moon-stars me-2"></i>Dark/Light mode</button>
+        <button id="themeToggleMobile" class="theme-toggle mb-3" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+            <i class="bi bi-moon-stars"></i>
+        </button>
         <form method="post" action="/accounts/logout/" class="mt-auto">
             {% csrf_token %}
             <button type="submit" class="btn btn-outline-danger w-100">
@@ -515,21 +543,23 @@
         const toggleMobile = document.getElementById('themeToggleMobile');
         const storedTheme = localStorage.getItem('spndix-theme') || 'light';
 
-        html.setAttribute('data-theme', storedTheme === 'dark' ? 'dark' : 'light');
+        html.setAttribute('data-bs-theme', storedTheme === 'dark' ? 'dark' : 'light');
 
         function syncIcons() {
-            const dark = html.getAttribute('data-theme') === 'dark';
+            const dark = html.getAttribute('data-bs-theme') === 'dark';
             [toggleDesktop, toggleMobile].forEach((btn) => {
                 if (!btn) return;
                 btn.innerHTML = dark
-                    ? '<i class="bi bi-sun me-0 me-md-2"></i><span class="d-none d-md-inline">Light mode</span>'
-                    : '<i class="bi bi-moon-stars me-0 me-md-2"></i><span class="d-none d-md-inline">Dark mode</span>';
+                    ? '<i class="bi bi-sun"></i>'
+                    : '<i class="bi bi-moon-stars"></i>';
+                btn.setAttribute('title', dark ? 'Switch to light mode' : 'Switch to dark mode');
+                btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
             });
         }
 
         function toggleTheme() {
-            const nextTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            html.setAttribute('data-theme', nextTheme);
+            const nextTheme = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-bs-theme', nextTheme);
             localStorage.setItem('spndix-theme', nextTheme);
             syncIcons();
         }

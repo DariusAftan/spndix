@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
         <h2 class="mb-1"><i class="bi bi-piggy-bank me-2"></i>Bugetele mele</h2>
-        <p class="text-muted mb-0">Monitorizează limitele pe categorii și lunile setate.</p>
+        <p class="text-body-secondary mb-0">Monitorizează limitele pe categorii și lunile setate.</p>
     </div>
     <a href="{% url 'adauga_buget' %}" class="btn btn-primary">
         <i class="bi bi-plus-lg me-1"></i> Adaugă Buget
@@ -22,12 +22,12 @@
                         <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                             <div>
                                 <h5 class="card-title mb-1">{{ buget.categorie.nume }}</h5>
-                                <div class="text-muted small">{{ buget.luna_display }} {{ buget.an }}</div>
+                                <div class="text-body-secondary small">{{ buget.luna_display }} {{ buget.an }}</div>
                             </div>
                             {% if buget.excedat %}
                                 <span class="badge bg-danger">Depășit</span>
                             {% elif buget.procent >= 80 %}
-                                <span class="badge bg-warning text-dark">Aproape de limită</span>
+                                <span class="badge bg-warning text-body">Aproape de limită</span>
                             {% else %}
                                 <span class="badge bg-success">În regulă</span>
                             {% endif %}
@@ -42,7 +42,7 @@
                                 {{ buget.procent }}%
                             </div>
                         </div>
-                        <div class="d-flex justify-content-between small text-muted">
+                        <div class="d-flex justify-content-between small text-body-secondary">
                             <span>Rămas: {{ buget.ramas|floatformat:2 }} RON</span>
                             <span>{{ buget.status }}</span>
                         </div>
@@ -68,8 +68,8 @@
     </div>
 {% else %}
     <div class="text-center py-5">
-        <i class="bi bi-piggy-bank display-1 text-muted"></i>
-        <p class="mt-3 text-muted fs-5">Nu ai niciun buget creat încă.</p>
+        <i class="bi bi-piggy-bank display-1 text-body-secondary"></i>
+        <p class="mt-3 text-body-secondary fs-5">Nu ai niciun buget creat încă.</p>
         <a href="{% url 'adauga_buget' %}" class="btn btn-primary mt-2">
             <i class="bi bi-plus-lg"></i> Adaugă primul buget
         </a>

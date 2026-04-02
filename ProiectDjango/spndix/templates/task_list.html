@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
         <h2 class="mb-1"><i class="bi bi-journal-text me-2"></i>Lista cheltuieli</h2>
-        <p class="text-muted mb-0">Vizualizare simplificată pentru înregistrări.</p>
+        <p class="text-body-secondary mb-0">Vizualizare simplificată pentru înregistrări.</p>
     </div>
 </div>
 
@@ -17,13 +17,13 @@
                 <div class="p-3" style="border:1px solid var(--border); border-radius:14px;">
                     <div class="d-flex justify-content-between gap-3 flex-wrap">
                         <div class="fw-semibold">{{ cheltuiala.titlu }}</div>
-                        <div class="text-muted small">{{ cheltuiala.descriere|default:'Fără descriere' }}</div>
+                        <div class="text-body-secondary small">{{ cheltuiala.descriere|default:'Fără descriere' }}</div>
                     </div>
                 </div>
             {% endfor %}
         </div>
     {% else %}
-        <div class="text-center py-4 text-muted">
+        <div class="text-center py-4 text-body-secondary">
             <i class="bi bi-inbox fs-2"></i>
             <p class="mb-0 mt-2">Nu există cheltuieli.</p>
         </div>
