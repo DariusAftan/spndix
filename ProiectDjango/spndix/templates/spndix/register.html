@@ -1,19 +1,52 @@
 {% extends 'spndix/base.html' %}
 {% block titlu %}Înregistrare{% endblock %}
 
+{% block extra_head %}
+<style>
+    .auth-shell {
+        min-height: calc(100vh - 190px);
+    }
+
+    .auth-left {
+        border-radius: 24px;
+        background: linear-gradient(145deg, #0f172a, #1a1a2e 52%, #00c896 180%);
+        color: #fff;
+        padding: 2.4rem;
+        height: 100%;
+    }
+
+    .auth-right {
+        border-radius: 24px;
+        padding: 2rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-person-plus"></i> Creează cont</h4>
+<div class="row g-4 align-items-stretch auth-shell">
+    <div class="col-lg-6 d-none d-lg-block">
+        <div class="auth-left d-flex flex-column justify-content-between shadow-sm">
+            <div>
+                <p class="text-white-50 mb-2">Bun venit în Spndix</p>
+                <h2 class="fw-bold mb-3">Construiește obiceiuri financiare mai bune, zilnic.</h2>
+                <p class="text-white-50 mb-0">Setezi bugete, urmărești cheltuieli și primești insight-uri inteligente într-un spațiu clar și minimalist.</p>
             </div>
-            <div class="card-body">
+            <div class="d-flex align-items-center gap-2 text-white-50 small">
+                <i class="bi bi-stars"></i>
+                <span>Onboarding rapid • experiență mobilă optimizată</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card auth-right h-100 d-flex justify-content-center">
+            <div>
+                <h4 class="mb-3"><i class="bi bi-person-plus me-2"></i>Creează cont</h4>
                 <form method="post">
                     {% csrf_token %}
                     {% for field in form %}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">{{ field.label }}</label>
+                            <label class="form-label fw-semibold small text-muted">{{ field.label }}</label>
                             {{ field }}
                             {% if field.help_text %}
                                 <div class="form-text text-muted">{{ field.help_text }}</div>
@@ -24,11 +57,11 @@
                         </div>
                     {% endfor %}
                     <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-check-lg"></i> Creează cont
+                        <i class="bi bi-check-lg me-1"></i> Creează cont
                     </button>
                 </form>
                 <hr>
-                <p class="text-center mb-0">
+                <p class="text-center mb-0 text-muted">
                     Ai deja cont? <a href="/accounts/login/">Autentifică-te</a>
                 </p>
             </div>

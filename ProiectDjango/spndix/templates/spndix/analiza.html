@@ -5,12 +5,12 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h2 class="mb-1"><i class="bi bi-robot"></i> Analiză AI</h2>
+        <h2 class="mb-1"><i class="bi bi-robot me-2"></i>Analiză AI</h2>
         <p class="text-muted mb-0">Generează o analiză financiară pentru luna selectată cu Gemini.</p>
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
+<div class="card mb-4 p-2">
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end">
             <div class="col-md-3">
@@ -31,10 +31,10 @@
             </div>
             <div class="col-md-6 d-flex gap-2 flex-wrap">
                 <button type="submit" class="btn btn-outline-primary">
-                    <i class="bi bi-funnel"></i> Filtrează
+                    <i class="bi bi-funnel me-1"></i> Filtrează
                 </button>
                 <a href="{% url 'analiza_ai' %}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-clockwise"></i> Resetează
+                    <i class="bi bi-arrow-clockwise me-1"></i> Resetează
                 </a>
             </div>
         </form>
@@ -42,7 +42,7 @@
 </div>
 
 {% if warning_date_insuficiente %}
-    <div class="alert alert-warning d-flex align-items-center gap-2 shadow-sm">
+    <div class="alert alert-warning d-flex align-items-center gap-2">
         <i class="bi bi-exclamation-triangle-fill"></i>
         <div>
             Ai doar {{ cheltuieli_count }} cheltuieli în luna selectată. Analiza poate fi limitată; adaugă mai multe cheltuieli pentru recomandări mai precise.
@@ -51,10 +51,10 @@
 {% endif %}
 
 {% if analiza_exista and analiza %}
-    <div class="card shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="card p-2">
+        <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h5 class="mb-0"><i class="bi bi-robot"></i> Analiză generată</h5>
+                <h5 class="mb-0"><i class="bi bi-robot me-2"></i>Analiză generată</h5>
                 <small class="text-muted">{{ analiza.creat_la|date:"d.m.Y H:i" }}</small>
             </div>
             <form method="post" class="m-0">
@@ -63,7 +63,7 @@
                 <input type="hidden" name="year" value="{{ an_selectat }}">
                 <input type="hidden" name="force" value="1">
                 <button type="submit" class="btn btn-danger">
-                    <i class="bi bi-arrow-repeat"></i> Regenerează
+                    <i class="bi bi-arrow-repeat me-1"></i> Regenerează
                 </button>
             </form>
         </div>
@@ -72,7 +72,7 @@
                 <i class="bi bi-check-circle-fill"></i>
                 <div>Analiza pentru {{ analiza.get_luna_display }} {{ analiza.an }} este salvată în baza de date.</div>
             </div>
-            <div class="border rounded-3 p-4 bg-light">
+            <div class="p-4" style="border:1px solid var(--border); border-radius: 16px; background: color-mix(in srgb, var(--bg-soft) 92%, transparent);">
                 <div class="analysis-text">
                     {{ analiza.continut_analiza|linebreaks }}
                 </div>
@@ -80,7 +80,7 @@
         </div>
     </div>
 {% else %}
-    <div class="card shadow-sm">
+    <div class="card p-2">
         <div class="card-body">
             <div class="row g-4 align-items-start">
                 <div class="col-lg-7">
@@ -107,7 +107,7 @@
                         <input type="hidden" name="month" value="{{ luna_selectata }}">
                         <input type="hidden" name="year" value="{{ an_selectat }}">
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-robot"></i> Generează Analiză
+                            <i class="bi bi-robot me-1"></i> Generează Analiză
                         </button>
                     </form>
                 </div>

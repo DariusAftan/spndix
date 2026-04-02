@@ -2,17 +2,27 @@
 
 {% block titlu %}Scanează Bon - Spndix{% endblock %}
 
+{% block extra_head %}
+<style>
+    .upload-panel {
+        border: 1px dashed color-mix(in srgb, var(--primary) 30%, transparent);
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--bg-soft) 94%, transparent);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h2 class="mb-1"><i class="bi bi-upc-scan"></i> Scanează bon</h2>
+        <h2 class="mb-1"><i class="bi bi-upc-scan me-2"></i>Scanează bon</h2>
         <p class="text-muted mb-0">Încarcă un bon JPG, PNG sau PDF și extrage automat cheltuiala.</p>
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
+<div class="card mb-4">
     <div class="card-body">
-        <form method="post" enctype="multipart/form-data" class="row g-3 align-items-end" id="uploadReceiptForm">
+        <form method="post" enctype="multipart/form-data" class="row g-3 align-items-end upload-panel p-3" id="uploadReceiptForm">
             {% csrf_token %}
             <input type="hidden" name="action" value="analizeaza">
             <div class="col-md-8">
@@ -21,7 +31,7 @@
             </div>
             <div class="col-md-4 d-grid">
                 <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search"></i> Analizează Bonul
+                    <i class="bi bi-search me-1"></i> Analizează Bonul
                 </button>
             </div>
         </form>
@@ -31,9 +41,9 @@
 {% if bon_scan %}
     <div class="row g-4">
         <div class="col-lg-5">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white fw-semibold">
-                    <i class="bi bi-image"></i> Preview bon
+            <div class="card h-100">
+                <div class="card-header bg-transparent border-0 fw-semibold">
+                    <i class="bi bi-image me-1"></i> Preview bon
                 </div>
                 <div class="card-body text-center">
                     <img src="{{ bon_scan.file_url }}" alt="Preview bon" class="img-fluid rounded border">
@@ -42,9 +52,9 @@
             </div>
         </div>
         <div class="col-lg-7">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <span class="fw-semibold"><i class="bi bi-list-check"></i> Rezultate extrase</span>
+            <div class="card mb-4">
+                <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span class="fw-semibold"><i class="bi bi-list-check me-1"></i> Rezultate extrase</span>
                     <span class="badge bg-success">Analizat</span>
                 </div>
                 <div class="card-body">
@@ -182,7 +192,7 @@
         </div>
     </div>
 {% else %}
-    <div class="card shadow-sm">
+    <div class="card">
         <div class="card-body text-center py-5">
             <i class="bi bi-upc-scan display-1 text-muted"></i>
             <p class="mt-3 text-muted fs-5 mb-0">Încarcă un bon pentru a vedea rezultatele extrase și a-l transforma într-o cheltuială.</p>

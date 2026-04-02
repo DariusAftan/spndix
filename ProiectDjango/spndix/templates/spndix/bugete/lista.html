@@ -5,11 +5,11 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h2 class="mb-1"><i class="bi bi-piggy-bank"></i> Bugetele mele</h2>
+        <h2 class="mb-1"><i class="bi bi-piggy-bank me-2"></i>Bugetele mele</h2>
         <p class="text-muted mb-0">Monitorizează limitele pe categorii și lunile setate.</p>
     </div>
     <a href="{% url 'adauga_buget' %}" class="btn btn-primary">
-        <i class="bi bi-plus-lg"></i> Adaugă Buget
+        <i class="bi bi-plus-lg me-1"></i> Adaugă Buget
     </a>
 </div>
 
@@ -17,7 +17,7 @@
     <div class="row g-3">
         {% for buget in bugete %}
             <div class="col-lg-6">
-                <div class="card shadow-sm h-100">
+                <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                             <div>
@@ -54,10 +54,10 @@
                         {% endif %}
 
                         <div class="d-flex gap-2 mt-3">
-                            <a href="{% url 'editeaza_buget' buget.id %}" class="btn btn-sm btn-warning">
+                            <a href="{% url 'editeaza_buget' buget.id %}" class="btn btn-sm btn-outline-dark">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            <a href="{% url 'sterge_buget' buget.id %}" class="btn btn-sm btn-danger">
+                            <a href="{% url 'sterge_buget' buget.id %}" class="btn btn-sm btn-outline-danger">
                                 <i class="bi bi-trash"></i>
                             </a>
                         </div>

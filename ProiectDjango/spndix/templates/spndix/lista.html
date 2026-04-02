@@ -2,21 +2,70 @@
 
 {% block titlu %}Lista Cheltuieli{% endblock %}
 
+{% block extra_head %}
+<style>
+    .expense-card {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--bg-card);
+        transition: all .22s ease;
+    }
+
+    .expense-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .expense-card + .expense-card {
+        margin-top: 0.2rem;
+    }
+
+    .expense-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .expense-actions {
+        opacity: 0;
+        transform: translateX(6px);
+        transition: all .18s ease;
+    }
+
+    .expense-card:hover .expense-actions,
+    .expense-card:focus-within .expense-actions {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    @media (max-width: 991.98px) {
+        .expense-actions {
+            opacity: 1;
+            transform: none;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h2 class="mb-1"><i class="bi bi-list-ul"></i> Cheltuielile mele</h2>
-        <p class="text-muted mb-0">Filtrează după lună și an, apoi exportă în Excel sau PDF.</p>
+        <h2 class="page-title mb-1"><i class="bi bi-list-ul me-2"></i>Cheltuielile mele</h2>
+        <p class="text-muted mb-0">Vizualizare modernă cu filtre rapide și căutare instant.</p>
     </div>
-    <a href="{% url 'adauga_cheltuiala' %}" class="btn btn-primary">
-        <i class="bi bi-plus-lg"></i> Adaugă Cheltuială
+    <a href="{% url 'adauga_cheltuiala' %}" class="btn btn-primary px-4">
+        <i class="bi bi-plus-lg me-1"></i> Adaugă Cheltuială
     </a>
 </div>
 
-<div class="card shadow-sm mb-4">
+<div class="card mb-4 p-3 fade-in">
     <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-md-3">
+        <form method="get" class="row g-3 align-items-end mb-3">
+            <div class="col-md-2">
                 <label class="form-label fw-semibold">Lună</label>
                 <select name="month" class="form-select">
                     {% for value, label in luni %}
@@ -24,7 +73,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label fw-semibold">An</label>
                 <select name="year" class="form-select">
                     {% for year in ani_disponibili %}
@@ -32,84 +81,170 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-6 d-flex gap-2 flex-wrap">
+            <div class="col-md-8 d-flex gap-2 flex-wrap">
                 <button type="submit" class="btn btn-outline-primary">
-                    <i class="bi bi-funnel"></i> Filtrează
+                    <i class="bi bi-funnel me-1"></i> Filtrează
                 </button>
                 <a href="{% url 'export_cheltuieli_excel' %}?month={{ luna_selectata }}&year={{ an_selectat }}" class="btn btn-success">
-                    <i class="bi bi-file-earmark-excel"></i> Export Excel
+                    <i class="bi bi-file-earmark-excel me-1"></i> Export Excel
                 </a>
                 <a href="{% url 'export_cheltuieli_pdf' %}?month={{ luna_selectata }}&year={{ an_selectat }}" class="btn btn-danger">
-                    <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                    <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
                 </a>
             </div>
         </form>
+
+        <div class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent"><i class="bi bi-search"></i></span>
+                    <input id="searchInput" type="text" class="form-control" placeholder="Caută după titlu sau categorie">
+                </div>
+            </div>
+            <div class="col-md-4 d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-light quick-filter active" data-filter="all">Toate</button>
+                <button type="button" class="btn btn-light quick-filter" data-filter="current">Luna aceasta</button>
+            </div>
+            <div class="col-md-3">
+                <select id="categoryFilter" class="form-select">
+                    <option value="">Toate categoriile</option>
+                </select>
+            </div>
+        </div>
     </div>
 </div>
 
 {% if cheltuieli %}
-    <div class="card shadow-sm">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-primary">
-                    <tr>
-                        <th>Titlu</th>
-                        <th>Categorie</th>
-                        <th>Sumă</th>
-                        <th>Data</th>
-                        <th class="text-center">Acțiuni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in cheltuieli %}
-                    <tr>
-                        <td>{{ c.titlu }}</td>
-                        <td>
-                            {% if c.categorie %}
-                                {% with c.categorie.culoare|default:'#6c757d' as culoare %}
-                                    <span class="badge" style="background-color: {{ culoare }}">
-                                        {{ c.categorie.nume }}
-                                    </span>
-                                {% endwith %}
-                            {% else %}
-                                <span class="text-muted">—</span>
-                            {% endif %}
-                        </td>
-                        <td class="fw-bold text-danger">{{ c.suma }} RON</td>
-                        <td>{{ c.data }}</td>
-                        <td class="text-center">
-                            <a href="{% url 'editeaza_cheltuiala' c.pk %}" class="btn btn-sm btn-warning">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                            <a href="{% url 'sterge_cheltuiala' c.pk %}" class="btn btn-sm btn-danger">
-                                <i class="bi bi-trash"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <div id="expenseList" class="d-grid gap-2">
+        {% for c in cheltuieli %}
+            {% with nume=c.categorie.nume|default:'Other'|lower %}
+            <article class="expense-card p-3 fade-in"
+                data-title="{{ c.titlu|lower }}"
+                data-category="{{ c.categorie.nume|default:'Fără categorie'|lower }}"
+                data-month="{{ c.data|date:'m' }}"
+                data-year="{{ c.data|date:'Y' }}">
+                <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap flex-md-nowrap">
+                    <div class="d-flex align-items-center gap-3 min-w-0">
+                        {% if 'food' in nume or 'grocer' in nume %}
+                            <span class="expense-icon cat-food"><i class="bi bi-cart3"></i></span>
+                        {% elif 'transport' in nume or 'fuel' in nume or 'taxi' in nume %}
+                            <span class="expense-icon cat-transport"><i class="bi bi-car-front"></i></span>
+                        {% elif 'health' in nume or 'medic' in nume %}
+                            <span class="expense-icon cat-health"><i class="bi bi-heart-pulse"></i></span>
+                        {% elif 'entertain' in nume or 'cinema' in nume %}
+                            <span class="expense-icon cat-entertainment"><i class="bi bi-controller"></i></span>
+                        {% elif 'cloth' in nume %}
+                            <span class="expense-icon cat-clothing"><i class="bi bi-bag"></i></span>
+                        {% elif 'utilit' in nume or 'electric' in nume or 'gas' in nume %}
+                            <span class="expense-icon cat-utilities"><i class="bi bi-lightning"></i></span>
+                        {% elif 'education' in nume or 'book' in nume %}
+                            <span class="expense-icon cat-education"><i class="bi bi-book"></i></span>
+                        {% elif 'saving' in nume %}
+                            <span class="expense-icon cat-savings"><i class="bi bi-piggy-bank"></i></span>
+                        {% elif 'dining' in nume or 'cafes' in nume %}
+                            <span class="expense-icon cat-dining"><i class="bi bi-cup-hot"></i></span>
+                        {% elif 'subscription' in nume or 'netflix' in nume or 'spotify' in nume %}
+                            <span class="expense-icon cat-subscriptions"><i class="bi bi-tv"></i></span>
+                        {% else %}
+                            <span class="expense-icon cat-other"><i class="bi bi-three-dots"></i></span>
+                        {% endif %}
+
+                        <div class="min-w-0">
+                            <div class="fw-semibold text-truncate">{{ c.titlu }}</div>
+                            <div class="small text-muted">{{ c.categorie.nume|default:'Fără categorie' }}</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-3 ms-md-auto">
+                        <div class="text-end">
+                            <div class="amount" style="color: var(--danger);">-{{ c.suma|floatformat:2 }} RON</div>
+                            <div class="small text-muted">{{ c.data|date:'d.m.Y' }}</div>
+                        </div>
+                        <div class="expense-actions d-flex gap-2">
+                            <a href="{% url 'editeaza_cheltuiala' c.pk %}" class="btn btn-sm btn-outline-dark"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'sterge_cheltuiala' c.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            {% endwith %}
+        {% endfor %}
+    </div>
+
+    <div id="emptyClientFilter" class="text-center py-4 d-none">
+        <i class="bi bi-search text-muted fs-2"></i>
+        <p class="text-muted mb-0 mt-2">Nu există cheltuieli care corespund filtrelor.</p>
     </div>
 
     <div class="mt-3 text-end">
-        <strong>Total cheltuit: 
-            <span class="text-danger">
-                {{ total_cheltuit|floatformat:2 }} RON
-            </span>
-        </strong>
-        <div class="text-muted small mt-1">
-            {{ cheltuieli|length }} înregistrări
-        </div>
+        <strong>Total cheltuit: <span style="color:#ff6b6b;">{{ total_cheltuit|floatformat:2 }} RON</span></strong>
+        <div class="text-muted small mt-1">{{ cheltuieli|length }} înregistrări</div>
     </div>
-
 {% else %}
-    <div class="text-center py-5">
+    <div class="text-center py-5 card">
         <i class="bi bi-inbox display-1 text-muted"></i>
         <p class="mt-3 text-muted fs-5">Nu ai nicio cheltuială pentru luna selectată.</p>
         <a href="{% url 'adauga_cheltuiala' %}" class="btn btn-primary mt-2">
-            <i class="bi bi-plus-lg"></i> Adaugă prima cheltuială
+            <i class="bi bi-plus-lg me-1"></i> Adaugă prima cheltuială
         </a>
     </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    (function () {
+        const cards = Array.from(document.querySelectorAll('#expenseList .expense-card'));
+        if (!cards.length) return;
+
+        const now = new Date();
+        const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const currentYear = String(now.getFullYear());
+        const searchInput = document.getElementById('searchInput');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const emptyState = document.getElementById('emptyClientFilter');
+        const quickButtons = document.querySelectorAll('.quick-filter');
+        let quickFilter = 'all';
+
+        const categories = [...new Set(cards.map((card) => card.dataset.category).filter(Boolean))].sort();
+        categories.forEach((cat) => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+            categoryFilter.appendChild(option);
+        });
+
+        function applyFilters() {
+            const text = (searchInput.value || '').toLowerCase().trim();
+            const selectedCategory = (categoryFilter.value || '').toLowerCase();
+            let visible = 0;
+
+            cards.forEach((card) => {
+                const title = card.dataset.title || '';
+                const category = card.dataset.category || '';
+                const matchesText = !text || title.includes(text) || category.includes(text);
+                const matchesCategory = !selectedCategory || category === selectedCategory;
+                const matchesQuick = quickFilter === 'all' || (card.dataset.month === currentMonth && card.dataset.year === currentYear);
+                const show = matchesText && matchesCategory && matchesQuick;
+
+                card.classList.toggle('d-none', !show);
+                if (show) visible += 1;
+            });
+
+            emptyState.classList.toggle('d-none', visible !== 0);
+        }
+
+        searchInput.addEventListener('input', applyFilters);
+        categoryFilter.addEventListener('change', applyFilters);
+
+        quickButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                quickButtons.forEach((b) => b.classList.remove('active'));
+                button.classList.add('active');
+                quickFilter = button.dataset.filter;
+                applyFilters();
+            });
+        });
+    })();
+</script>
 {% endblock %}

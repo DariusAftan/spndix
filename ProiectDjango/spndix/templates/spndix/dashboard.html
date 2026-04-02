@@ -1,133 +1,197 @@
 {% extends 'spndix/base.html' %}
 {% block titlu %}Dashboard - Spndix{% endblock %}
 
+{% block extra_head %}
+<style>
+    .hero-card {
+        border-radius: 24px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: #fff;
+        border: none;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .hero-card::after {
+        content: "";
+        position: absolute;
+        width: 280px;
+        height: 280px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        top: -130px;
+        right: -80px;
+    }
+
+    .stat-card {
+        border-radius: 18px;
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--accent);
+        background: var(--bg-card);
+        transition: all .24s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 1.25rem;
+    }
+
+    .recent-item {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: .9rem;
+        background: var(--bg-card);
+        transition: all .2s ease;
+    }
+
+    .recent-item:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .cat-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+
+    .stat-general { border-left-color: var(--success); }
+    .stat-transactions { border-left-color: var(--danger); }
+    .stat-budget { border-left-color: var(--accent); }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h2 class="mb-0"><i class="bi bi-speedometer2"></i> Dashboard</h2>
-    <a href="{% url 'adauga_cheltuiala' %}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Adaugă cheltuială
-    </a>
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="hero-card p-4 p-lg-5 shadow-sm fade-in">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 position-relative" style="z-index:1;">
+                <div>
+                    <p class="text-white-50 mb-2">Bine ai revenit. Acesta este sumarul tău financiar.</p>
+                    <div class="subtitle text-white-50 mb-2">Luna curentă</div>
+                    <h2 class="fw-semibold mb-1 text-white">Total cheltuit în luna curentă</h2>
+                    <div class="display-5 fw-bold mb-2"><span id="heroCounter" data-target="{{ total_luna|floatformat:2 }}">0.00</span> RON</div>
+                    <p class="mb-0 text-white-50">{{ luna_curenta }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'adauga_cheltuiala' %}" class="btn btn-success">
+                        <i class="bi bi-plus-circle me-1"></i>Adaugă cheltuială
+                    </a>
+                    <a href="{% url 'analiza_ai' %}" class="btn btn-light">
+                        <i class="bi bi-robot me-1"></i>Analiză AI
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="stat-card stat-general h-100 fade-in">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="subtitle mb-1">Total general</div>
+                    <h4 class="mb-0 amount">{{ total_general|floatformat:2 }} RON</h4>
+                </div>
+                <span class="stat-icon cat-savings"><i class="bi bi-wallet2"></i></span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card stat-transactions h-100 fade-in">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="subtitle mb-1">Ultimele tranzacții</div>
+                    <h4 class="mb-0 amount">{{ ultimele_cheltuieli.count }}</h4>
+                </div>
+                <span class="stat-icon cat-health"><i class="bi bi-receipt-cutoff"></i></span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card stat-budget h-100 fade-in">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="subtitle mb-1">Bugete depășite</div>
+                    <h4 class="mb-0 amount">{{ bugete_depasite|length }}</h4>
+                </div>
+                <span class="stat-icon cat-subscriptions"><i class="bi bi-piggy-bank"></i></span>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="mb-1 opacity-75">Luna curentă</p>
-                        <h3 class="mb-0">{{ total_luna }} RON</h3>
-                        <small class="opacity-75">{{ luna_curenta }}</small>
-                    </div>
-                    <i class="bi bi-calendar-month display-4 opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="mb-1 opacity-75">Total general</p>
-                        <h3 class="mb-0">{{ total_general }} RON</h3>
-                        <small class="opacity-75">Toate timpurile</small>
-                    </div>
-                    <i class="bi bi-cash-stack display-4 opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 bg-warning text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="mb-1 opacity-75">Cheltuieli înregistrate</p>
-                        <h3 class="mb-0">{{ ultimele_cheltuieli.count }}</h3>
-                        <small class="opacity-75">Ultimele 5 afișate</small>
-                    </div>
-                    <i class="bi bi-receipt display-4 opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span class="fw-semibold"><i class="bi bi-piggy-bank"></i> Bugete active</span>
+<div class="card mb-4 fade-in">
+    <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="fw-semibold"><i class="bi bi-piggy-bank me-2"></i>Bugete active</span>
         <div class="d-flex gap-2">
-            <a href="{% url 'lista_bugete' %}" class="btn btn-sm btn-outline-primary">Vezi toate</a>
-            <a href="{% url 'adauga_buget' %}" class="btn btn-sm btn-primary">Adaugă buget</a>
+            <a href="{% url 'lista_bugete' %}" class="btn btn-outline-dark btn-sm"><i class="bi bi-grid me-1"></i>Vezi toate</a>
+            <a href="{% url 'adauga_buget' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Adaugă</a>
         </div>
     </div>
-    <div class="card-body">
+    <div class="card-body px-4 pb-4">
         {% if bugete_dashboard %}
             {% if bugete_depasite %}
-                <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <div>{{ bugete_depasite|length }} buget{{ bugete_depasite|length|pluralize:"e" }} depășit{{ bugete_depasite|length|pluralize:"e" }} în luna curentă.</div>
-                </div>
+                <div class="alert alert-danger mb-3"><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ bugete_depasite|length }} buget{{ bugete_depasite|length|pluralize:"e" }} depășit{{ bugete_depasite|length|pluralize:"e" }} în luna curentă.</div>
             {% endif %}
             {% for buget in bugete_dashboard %}
                 <div class="mb-4">
                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
                         <div>
-                            <div class="fw-semibold fs-5">{{ buget.categorie.nume }}</div>
-                            <div class="text-muted small">{{ buget.luna_display }} {{ buget.an }}</div>
+                            <div class="fw-semibold">{{ buget.categorie.nume }}</div>
+                            <div class="small text-muted">{{ buget.luna_display }} {{ buget.an }}</div>
                         </div>
                         <div class="text-end">
                             <div class="fw-semibold">{{ buget.suma_cheltuita|floatformat:2 }} / {{ buget.suma_limita|floatformat:2 }} RON</div>
-                            <div class="small {% if buget.excedat %}text-danger{% elif buget.procent >= 80 %}text-warning{% else %}text-success{% endif %}">
-                                {{ buget.procent }}% utilizat · {{ buget.status }}
-                            </div>
+                            <div class="small {% if buget.excedat %}text-danger{% elif buget.procent >= 80 %}text-warning{% else %}text-success{% endif %}">{{ buget.procent }}% utilizat · {{ buget.status }}</div>
                         </div>
                     </div>
-                    <div class="progress" style="height: 22px;">
-                        <div class="progress-bar {{ buget.bar_class }}" role="progressbar" style="width: {{ buget.progres }}%;" aria-valuenow="{{ buget.progres }}" aria-valuemin="0" aria-valuemax="100">
-                            {{ buget.procent }}%
-                        </div>
+                    <div class="progress" style="height: 11px; background: var(--bg-secondary);">
+                        <div class="progress-bar {{ buget.bar_class }}" role="progressbar" style="width: {{ buget.progres }}%; border-radius: 999px;"></div>
                     </div>
-                    {% if buget.excedat %}
-                        <div class="alert alert-danger mt-2 mb-0 py-2 small">
-                            Ai depășit bugetul cu {{ buget.depasire|floatformat:2 }} RON.
-                        </div>
-                    {% endif %}
                 </div>
             {% endfor %}
         {% else %}
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-piggy-bank display-4"></i>
-                <p class="mt-2 mb-0">Nu ai încă bugete pentru luna curentă.</p>
-                <a href="{% url 'adauga_buget' %}" class="btn btn-primary mt-3">Adaugă primul buget</a>
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-piggy-bank fs-2"></i>
+                <p class="mb-0 mt-2">Nu ai încă bugete pentru luna curentă.</p>
             </div>
         {% endif %}
     </div>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white fw-semibold">
-                <i class="bi bi-pie-chart"></i> Cheltuieli pe categorii (luna curentă)
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100 p-3 fade-in">
+            <div class="d-flex justify-content-between align-items-center mb-2 px-2">
+                <h6 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Cheltuieli pe categorii</h6>
             </div>
             <div class="card-body">
                 {% if pie_labels and pie_data %}
-                <canvas id="pieChart" height="250"></canvas>
+                    <canvas id="pieChart" height="250"></canvas>
                 {% else %}
-                <div class="text-center text-muted py-5">
-                    <i class="bi bi-inbox display-4"></i>
-                    <p class="mt-2">Nu există date pentru luna curentă</p>
-                </div>
+                    <div class="text-center py-5 text-muted"><i class="bi bi-inbox fs-2"></i><p class="mb-0 mt-2">Nu există date pentru luna curentă.</p></div>
                 {% endif %}
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white fw-semibold">
-                <i class="bi bi-bar-chart"></i> Cheltuieli ultimele 6 luni
+    <div class="col-lg-6">
+        <div class="card h-100 p-3 fade-in">
+            <div class="d-flex justify-content-between align-items-center mb-2 px-2">
+                <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Ultimele 6 luni</h6>
             </div>
             <div class="card-body">
                 <canvas id="barChart" height="250"></canvas>
@@ -136,99 +200,134 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <span class="fw-semibold"><i class="bi bi-clock-history"></i> Ultimele cheltuieli</span>
-        <a href="{% url 'lista_cheltuieli' %}" class="btn btn-sm btn-outline-primary">
-            Vezi toate
-        </a>
+<div class="card p-4 fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Ultimele cheltuieli</h6>
+        <a href="{% url 'lista_cheltuieli' %}" class="btn btn-outline-dark btn-sm">Vezi toate</a>
     </div>
-    <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Titlu</th>
-                    <th>Categorie</th>
-                    <th>Sumă</th>
-                    <th>Data</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in ultimele_cheltuieli %}
-                <tr>
-                    <td>{{ c.titlu }}</td>
-                    <td>
-                        {% if c.categorie %}
-                        <span class="badge" style="background-color: {{ c.categorie.culoare }}">
-                            {{ c.categorie.nume }}
-                        </span>
-                        {% else %}
-                        <span class="text-muted">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="fw-bold text-danger">{{ c.suma }} RON</td>
-                    <td>{{ c.data }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4" class="text-center text-muted py-3">
-                        Nu există cheltuieli înregistrate.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
 
+    {% for c in ultimele_cheltuieli %}
+        {% with nume=c.categorie.nume|default:'Other'|lower %}
+        <div class="recent-item mb-2">
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    {% if 'food' in nume or 'grocer' in nume %}
+                        <span class="cat-avatar cat-food"><i class="bi bi-cart3"></i></span>
+                    {% elif 'transport' in nume or 'fuel' in nume or 'taxi' in nume %}
+                        <span class="cat-avatar cat-transport"><i class="bi bi-car-front"></i></span>
+                    {% elif 'health' in nume or 'medic' in nume %}
+                        <span class="cat-avatar cat-health"><i class="bi bi-heart-pulse"></i></span>
+                    {% elif 'entertain' in nume or 'cinema' in nume %}
+                        <span class="cat-avatar cat-entertainment"><i class="bi bi-controller"></i></span>
+                    {% elif 'cloth' in nume or 'accessories' in nume %}
+                        <span class="cat-avatar cat-clothing"><i class="bi bi-bag"></i></span>
+                    {% elif 'utilit' in nume or 'electric' in nume or 'gas' in nume or 'water' in nume %}
+                        <span class="cat-avatar cat-utilities"><i class="bi bi-lightning"></i></span>
+                    {% elif 'education' in nume or 'book' in nume %}
+                        <span class="cat-avatar cat-education"><i class="bi bi-book"></i></span>
+                    {% elif 'saving' in nume %}
+                        <span class="cat-avatar cat-savings"><i class="bi bi-piggy-bank"></i></span>
+                    {% elif 'dining' in nume or 'cafes' in nume %}
+                        <span class="cat-avatar cat-dining"><i class="bi bi-cup-hot"></i></span>
+                    {% elif 'subscription' in nume or 'netflix' in nume or 'spotify' in nume %}
+                        <span class="cat-avatar cat-subscriptions"><i class="bi bi-tv"></i></span>
+                    {% else %}
+                        <span class="cat-avatar cat-other"><i class="bi bi-three-dots"></i></span>
+                    {% endif %}
+                    <div>
+                        <div class="fw-semibold">{{ c.titlu }}</div>
+                        <div class="text-muted small">{{ c.categorie.nume|default:'Fără categorie' }}</div>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="amount" style="color: var(--danger);">-{{ c.suma|floatformat:2 }} RON</div>
+                    <div class="small text-muted">{{ c.data|date:'d.m.Y' }}</div>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+    {% empty %}
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-inbox fs-2"></i>
+            <p class="mb-0 mt-2">Nu există cheltuieli înregistrate.</p>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    {% if pie_labels and pie_data %}
-    const pieCtx = document.getElementById('pieChart').getContext('2d');
-    new Chart(pieCtx, {
-        type: 'doughnut',
-        data: {
-            labels: {{ pie_labels|safe }},
-        datasets: [{
-            data: {{ pie_data|safe }},
-        backgroundColor: [
-            '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e',
-            '#e74a3b', '#858796', '#5a5c69', '#2e59d9'
-        ],
-        borderWidth: 2,
-        }]
-    }
-});
-    {% endif %}
+    (function () {
+        const heroCounter = document.getElementById('heroCounter');
+        if (heroCounter) {
+            const target = parseFloat((heroCounter.dataset.target || '0').replace(',', '.'));
+            let value = 0;
+            const steps = 36;
+            const increment = target / steps;
+            const timer = setInterval(() => {
+                value += increment;
+                if (value >= target) {
+                    value = target;
+                    clearInterval(timer);
+                }
+                heroCounter.textContent = value.toFixed(2);
+            }, 24);
+        }
 
-    const barCtx = document.getElementById('barChart').getContext('2d');
-    new Chart(barCtx, {
-        type: 'bar',
-        data: {
-            labels: {{ bar_labels|safe }},
-        datasets: [{
-            label: 'Cheltuieli (RON)',
-            data: {{ bar_data|safe }},
-        backgroundColor: 'rgba(78, 115, 223, 0.7)',
-        borderColor: 'rgba(78, 115, 223, 1)',
-        borderWidth: 1,
-        borderRadius: 4,
-            }]
-        },
-        options: {
-        responsive: true,
-        plugins: {
-            legend: { display: false }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    callback: value => value + ' RON'
+        {% if pie_labels and pie_data %}
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        new Chart(pieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ pie_labels|safe }},
+                datasets: [{
+                    data: {{ pie_data|safe }},
+                    backgroundColor: ['#00c896', '#3c88ff', '#ff6b6b', '#9c27b0', '#ff8c40', '#ffd166', '#1a1a2e', '#8892b0'],
+                    borderWidth: 0,
+                    hoverOffset: 8,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true } } },
+                cutout: '68%',
+            }
+        });
+        {% endif %}
+
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        const gradient = barCtx.createLinearGradient(0, 0, 0, 280);
+        gradient.addColorStop(0, 'rgba(0,200,150,0.95)');
+        gradient.addColorStop(1, 'rgba(26,26,46,0.25)');
+
+        new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ bar_labels|safe }},
+                datasets: [{
+                    data: {{ bar_data|safe }},
+                    backgroundColor: gradient,
+                    borderWidth: 0,
+                    borderRadius: 12,
+                    maxBarThickness: 28,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: 'rgba(148, 163, 184, 0.12)' } },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(148, 163, 184, 0.12)' },
+                        ticks: {
+                            callback: (value) => `${value} RON`
+                        }
+                    }
                 }
             }
-        }
-    }
-    });
+        });
+    })();
 </script>
 {% endblock %}

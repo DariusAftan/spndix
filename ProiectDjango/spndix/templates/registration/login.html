@@ -1,33 +1,66 @@
 {% extends 'spndix/base.html' %}
 {% block titlu %}Login{% endblock %}
 
+{% block extra_head %}
+<style>
+    .auth-shell {
+        min-height: calc(100vh - 190px);
+    }
+
+    .auth-left {
+        border-radius: 24px;
+        background: linear-gradient(145deg, #1a1a2e, #273469 65%, #00c896 160%);
+        color: #fff;
+        padding: 2.4rem;
+        height: 100%;
+    }
+
+    .auth-right {
+        border-radius: 24px;
+        padding: 2rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-box-arrow-in-right"></i> Autentificare</h4>
+<div class="row g-4 align-items-stretch auth-shell">
+    <div class="col-lg-6 d-none d-lg-block">
+        <div class="auth-left d-flex flex-column justify-content-between shadow-sm">
+            <div>
+                <p class="text-white-50 mb-2">Spndix</p>
+                <h2 class="fw-bold mb-3">Controlează-ți banii simplu și elegant.</h2>
+                <p class="text-white-50 mb-0">Dashboard inteligent, bugete clare și analiză AI într-o interfață modernă inspirată de aplicațiile financiare premium.</p>
             </div>
-            <div class="card-body">
+            <div class="d-flex align-items-center gap-2 text-white-50 small">
+                <i class="bi bi-shield-check"></i>
+                <span>Conexiune sigură • Datele tale rămân private</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card auth-right h-100 d-flex justify-content-center">
+            <div>
+                <h4 class="mb-3"><i class="bi bi-box-arrow-in-right me-2"></i>Autentificare</h4>
                 {% if form.errors %}
                     <div class="alert alert-danger">Username sau parolă greșite.</div>
                 {% endif %}
                 <form method="post">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Username</label>
-                        <input type="text" name="username" class="form-control" autofocus>
+                    <div class="form-floating mb-3">
+                        <input type="text" name="username" class="form-control" id="id_username" placeholder="Username" autofocus>
+                        <label for="id_username">Username</label>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Parolă</label>
-                        <input type="password" name="password" class="form-control">
+                    <div class="form-floating mb-3">
+                        <input type="password" name="password" class="form-control" id="id_password" placeholder="Parolă">
+                        <label for="id_password">Parolă</label>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-box-arrow-in-right"></i> Login
+                        <i class="bi bi-box-arrow-in-right me-1"></i> Login
                     </button>
                 </form>
                 <hr>
-                <p class="text-center mb-0">
+                <p class="text-center mb-0 text-muted">
                     Nu ai cont? <a href="{% url 'register' %}">Înregistrează-te</a>
                 </p>
             </div>
