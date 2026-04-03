@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Cheltuiala, Categorie, Budget, AIAnaliza, UserProfile, LUNA_CHOICES
+from .models import Cheltuiala, Categorie, Budget, AIAnaliza, UserProfile, ForecastAlert, LUNA_CHOICES
 from .forms import CheltuialaForm, RegisterForm, BudgetForm, UserProfileForm
 from django.contrib import messages
 from django.contrib.auth import login
@@ -15,13 +15,14 @@ import base64
 import re
 import uuid
 from io import BytesIO
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from datetime import date
+from datetime import date, timedelta
+from calendar import monthrange
 
-import fitz
 import PIL.Image
 from PIL import ImageOps, UnidentifiedImageError
+from pypdf import PdfReader
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -72,6 +73,226 @@ def construieste_buget_dashboard(buget, utilizator):
         'ramas': round(max(suma_limita - suma_cheltuita_float, 0), 2),
         'depasire': round(max(suma_cheltuita_float - suma_limita, 0), 2),
     }
+
+
+def rotunjeste_bani(valoare):
+    return Decimal(valoare or 0).quantize(Decimal('0.01'))
+
+
+def creeaza_alerta_daca_nu_exista(
+    utilizator,
+    categorie,
+    tip,
+    mesaj,
+    suma_implicata,
+    zile_ramase,
+    actiune_recomandata,
+):
+    azi = timezone.localdate()
+    exista = ForecastAlert.objects.filter(
+        utilizator=utilizator,
+        categorie=categorie,
+        tip=tip,
+        mesaj=mesaj,
+        creat_la__date=azi,
+    ).exists()
+    if exista:
+        return None
+
+    return ForecastAlert.objects.create(
+        utilizator=utilizator,
+        categorie=categorie,
+        tip=tip,
+        mesaj=mesaj,
+        suma_implicata=rotunjeste_bani(suma_implicata),
+        zile_ramase=zile_ramase,
+        actiune_recomandata=actiune_recomandata,
+    )
+
+
+def detecteaza_recurente(utilizator, azi):
+    inceput_istoric = azi - timedelta(days=210)
+    cheltuieli_istorice = Cheltuiala.objects.filter(
+        utilizator=utilizator,
+        data__gte=inceput_istoric,
+        data__lt=azi,
+    ).select_related('categorie').order_by('titlu', 'data')
+
+    grupuri = {}
+    for cheltuiala in cheltuieli_istorice:
+        titlu_normalizat = (cheltuiala.titlu or '').strip().lower()
+        if not titlu_normalizat:
+            continue
+        grupuri.setdefault(titlu_normalizat, []).append(cheltuiala)
+
+    for _, elemente in grupuri.items():
+        luni_distincte = {(item.data.year, item.data.month) for item in elemente}
+        if len(luni_distincte) < 2:
+            continue
+
+        zile = [item.data.day for item in elemente]
+        if max(zile) - min(zile) > 7:
+            continue
+
+        zi_medie = max(1, round(sum(zile) / len(zile)))
+        exista_luna_curenta = any(item.data.year == azi.year and item.data.month == azi.month for item in elemente)
+
+        if not exista_luna_curenta and azi.day <= zi_medie:
+            an_tinta = azi.year
+            luna_tinta = azi.month
+        else:
+            if azi.month == 12:
+                an_tinta = azi.year + 1
+                luna_tinta = 1
+            else:
+                an_tinta = azi.year
+                luna_tinta = azi.month + 1
+
+        zi_tinta = min(zi_medie, monthrange(an_tinta, luna_tinta)[1])
+        data_urmatoare = date(an_tinta, luna_tinta, zi_tinta)
+        zile_ramase = (data_urmatoare - azi).days
+
+        if zile_ramase < 0 or zile_ramase > 40:
+            continue
+
+        ultima_cheltuiala = elemente[-1]
+        suma_estimata = rotunjeste_bani(sum(item.suma for item in elemente) / Decimal(len(elemente)))
+        mesaj = (
+            f"Cheltuială recurentă detectată: {ultima_cheltuiala.titlu} apare în fiecare lună. "
+            f"Urmează să apară în aproximativ {zile_ramase} zile cu o sumă estimată de {suma_estimata} RON."
+        )
+        actiune = 'Marchează ca așteptat sau setează reminder.'
+        creeaza_alerta_daca_nu_exista(
+            utilizator=utilizator,
+            categorie=ultima_cheltuiala.categorie,
+            tip='recurenta_detectata',
+            mesaj=mesaj,
+            suma_implicata=suma_estimata,
+            zile_ramase=zile_ramase,
+            actiune_recomandata=actiune,
+        )
+
+
+def calculate_forecasts(utilizator):
+    azi = timezone.localdate()
+    luna_curenta = azi.month
+    an_curent = azi.year
+    zile_trecute = max(azi.day, 1)
+    zile_in_luna = monthrange(an_curent, luna_curenta)[1]
+    zile_ramase_luna = max(zile_in_luna - zile_trecute, 0)
+    data_sf_luna = date(an_curent, luna_curenta, zile_in_luna)
+
+    totaluri_categorii = Cheltuiala.objects.filter(
+        utilizator=utilizator,
+        data__month=luna_curenta,
+        data__year=an_curent,
+    ).values('categorie').annotate(total=Sum('suma'))
+
+    totaluri_map = {
+        item['categorie']: Decimal(item['total'] or 0)
+        for item in totaluri_categorii
+    }
+
+    luna_precedenta, an_precedent = (12, an_curent - 1) if luna_curenta == 1 else (luna_curenta - 1, an_curent)
+    totaluri_precedente = Cheltuiala.objects.filter(
+        utilizator=utilizator,
+        data__month=luna_precedenta,
+        data__year=an_precedent,
+    ).values('categorie').annotate(total=Sum('suma'))
+
+    totaluri_precedente_map = {
+        item['categorie']: Decimal(item['total'] or 0)
+        for item in totaluri_precedente
+    }
+
+    bugete_curente = Budget.objects.filter(
+        utilizator=utilizator,
+        luna=luna_curenta,
+        an=an_curent,
+    ).select_related('categorie')
+
+    for buget in bugete_curente:
+        suma_limita = Decimal(buget.suma_limita or 0)
+        if suma_limita <= 0:
+            continue
+
+        total_cheltuit = Decimal(totaluri_map.get(buget.categorie_id, Decimal('0')) or 0)
+        ritm_zilnic = total_cheltuit / Decimal(zile_trecute)
+        proiectie_luna = ritm_zilnic * Decimal(zile_in_luna)
+        procent_folosit = (total_cheltuit / suma_limita) * Decimal('100')
+        procent_text = procent_folosit.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)
+        suma_ramasa = rotunjeste_bani(max(suma_limita - total_cheltuit, Decimal('0')))
+
+        suma_depasire = rotunjeste_bani(max(proiectie_luna - suma_limita, Decimal('0')))
+        if suma_depasire > 0:
+            mesaj = (
+                f"La ritmul actual, vei depăși bugetul de {rotunjeste_bani(suma_limita)} RON pentru "
+                f"{buget.categorie.nume} cu aproximativ {suma_depasire} RON până la sfârșitul lunii."
+            )
+            actiune = (
+                f"Intră pe cheltuielile din {buget.categorie.nume} și prioritizează doar costurile "
+                "esențiale pentru restul lunii."
+            )
+            creeaza_alerta_daca_nu_exista(
+                utilizator=utilizator,
+                categorie=buget.categorie,
+                tip='depasire_iminenta',
+                mesaj=mesaj,
+                suma_implicata=suma_depasire,
+                zile_ramase=zile_ramase_luna,
+                actiune_recomandata=actiune,
+            )
+            continue
+
+        if proiectie_luna > suma_limita * Decimal('0.85') and proiectie_luna < suma_limita:
+            mesaj = (
+                f"Ai cheltuit {procent_text}% din bugetul pentru {buget.categorie.nume} și mai sunt "
+                f"{zile_ramase_luna} zile din lună. Încearcă să limitezi cheltuielile la {suma_ramasa} RON "
+                f"până pe {data_sf_luna.strftime('%d.%m.%Y')}."
+            )
+            actiune = (
+                f"Verifică zilnic categoria {buget.categorie.nume} și păstrează cheltuielile în limita de "
+                f"{suma_ramasa} RON pentru restul lunii."
+            )
+            creeaza_alerta_daca_nu_exista(
+                utilizator=utilizator,
+                categorie=buget.categorie,
+                tip='ritm_alert',
+                mesaj=mesaj,
+                suma_implicata=suma_ramasa,
+                zile_ramase=zile_ramase_luna,
+                actiune_recomandata=actiune,
+            )
+
+        if total_cheltuit < suma_limita * Decimal('0.5') and zile_trecute > 15:
+            total_luna_precedenta = Decimal(totaluri_precedente_map.get(buget.categorie_id, Decimal('0')) or 0)
+            economie = rotunjeste_bani(max(total_luna_precedenta - proiectie_luna, Decimal('0')))
+            if economie > 0:
+                mesaj = (
+                    f"Ai cheltuit doar {procent_text}% din bugetul pentru {buget.categorie.nume}. "
+                    f"Poți economisi până la {economie} RON față de luna trecută dacă menții același ritm."
+                )
+                actiune = (
+                    f"Menține ritmul curent în {buget.categorie.nume}; proiecția lunară este "
+                    f"{rotunjeste_bani(proiectie_luna)} RON."
+                )
+                creeaza_alerta_daca_nu_exista(
+                    utilizator=utilizator,
+                    categorie=buget.categorie,
+                    tip='economie_posibila',
+                    mesaj=mesaj,
+                    suma_implicata=economie,
+                    zile_ramase=zile_ramase_luna,
+                    actiune_recomandata=actiune,
+                )
+
+    detecteaza_recurente(utilizator, azi)
+
+    return list(
+        ForecastAlert.objects.filter(utilizator=utilizator, citita=False)
+        .select_related('categorie')
+        .order_by('-creat_la')[:8]
+    )
 
 
 def obtine_filtre_luna_an(request):
@@ -359,14 +580,34 @@ def pregateste_bon_upload(uploaded_file):
     imagine_path = original_path
 
     if extensie == '.pdf':
-        document = fitz.open(stream=file_bytes, filetype='pdf')
-        pagina = document.load_page(0)
-        pix = pagina.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+        try:
+            reader = PdfReader(BytesIO(file_bytes))
+        except Exception as exc:
+            raise ValueError('Fișierul PDF nu poate fi citit.') from exc
+
+        if not reader.pages:
+            raise ValueError('PDF-ul nu conține pagini valide.')
+
+        prima_pagina = reader.pages[0]
+        imagini = list(prima_pagina.images)
+        if not imagini:
+            raise ValueError('PDF-ul nu conține o imagine pe prima pagină. Încarcă un PDF scanat sau JPG/PNG.')
+
+        imagine_pdf = imagini[0]
+        try:
+            imagine = PIL.Image.open(BytesIO(imagine_pdf.data))
+            imagine = ImageOps.exif_transpose(imagine)
+            if imagine.mode not in ['RGB', 'L']:
+                imagine = imagine.convert('RGB')
+        except UnidentifiedImageError as exc:
+            raise ValueError('Imaginea extrasă din PDF nu este validă.') from exc
+
+        preview_buffer = BytesIO()
+        imagine.save(preview_buffer, format='PNG')
         preview_relativ = f'bonuri/{identificator}_preview.png'
-        preview_salvat = default_storage.save(preview_relativ, ContentFile(pix.tobytes('png')))
+        preview_salvat = default_storage.save(preview_relativ, ContentFile(preview_buffer.getvalue()))
         preview_url = default_storage.url(preview_salvat)
         imagine_path = default_storage.path(preview_salvat)
-        document.close()
     else:
         try:
             imagine = PIL.Image.open(BytesIO(file_bytes))
@@ -643,6 +884,8 @@ def dashboard(request):
         bar_labels.append(nume_luna)
         bar_data.append(float(total))
 
+    forecast_alerts = calculate_forecasts(request.user)
+
     context = {
         'total_luna': total_luna,
         'total_general': total_general,
@@ -654,15 +897,37 @@ def dashboard(request):
         'bar_labels': json.dumps(bar_labels),
         'bar_data': json.dumps(bar_data),
         'luna_curenta': azi.strftime('%B %Y'),
+        'forecast_alerts': forecast_alerts,
     }
     return render(request, 'spndix/dashboard.html', context)
+
+
+@login_required
+def marca_citita(request, pk):
+    alerta = get_object_or_404(ForecastAlert, pk=pk, utilizator=request.user)
+    if not alerta.citita:
+        alerta.citita = True
+        alerta.save(update_fields=['citita'])
+
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url:
+        return redirect(next_url)
+    return redirect('dashboard')
 
 @login_required
 def lista_cheltuieli(request):
     cheltuieli = Cheltuiala.objects.filter(utilizator=request.user).select_related('categorie').order_by('-data', '-id')
     luna_selectata, an_selectat = obtine_filtre_luna_an(request)
+    categorie_selectata = request.GET.get('categorie')
 
     cheltuieli_filtrate = cheltuieli.filter(data__month=luna_selectata, data__year=an_selectat)
+    if categorie_selectata:
+        try:
+            categorie_selectata = int(categorie_selectata)
+            cheltuieli_filtrate = cheltuieli_filtrate.filter(categorie_id=categorie_selectata)
+        except (TypeError, ValueError):
+            categorie_selectata = None
+
     total_cheltuit = cheltuieli_filtrate.aggregate(total=Sum('suma'))['total'] or 0
     ani_disponibili = sorted(
         set(
@@ -679,6 +944,7 @@ def lista_cheltuieli(request):
         'total_cheltuit': total_cheltuit,
         'luna_selectata': luna_selectata,
         'an_selectat': an_selectat,
+        'categorie_selectata': categorie_selectata,
         'luni': LUNA_CHOICES,
         'ani_disponibili': sorted(set(ani_disponibili), reverse=True),
     }
@@ -897,7 +1163,16 @@ def adauga_cheltuiala(request):
             return redirect('lista_cheltuieli')
     else:
         form = CheltuialaForm()
-    return render(request, 'spndix/form.html', {'form': form, 'titlu': 'Adaugă Cheltuială', 'cancel_url': 'lista_cheltuieli'})
+    return render(
+        request,
+        'spndix/form.html',
+        {
+            'form': form,
+            'titlu': 'Adaugă Cheltuială',
+            'cancel_url': 'lista_cheltuieli',
+            'show_scan_receipt_cta': True,
+        },
+    )
 
 @login_required
 def editeaza_cheltuiala(request, pk):

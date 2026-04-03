@@ -7,6 +7,7 @@ urlpatterns = [
     path('cheltuieli/export/excel/', views.export_cheltuieli_excel, name='export_cheltuieli_excel'),
     path('cheltuieli/export/pdf/', views.export_cheltuieli_pdf, name='export_cheltuieli_pdf'),
     path('analiza/', views.analiza_ai, name='analiza_ai'),
+    path('alerte/citita/<int:pk>/', views.marca_citita, name='marca_citita'),
     path('scaneaza-bon/', views.scaneaza_bon, name='scaneaza_bon'),
     path('adauga/', views.adauga_cheltuiala, name='adauga_cheltuiala'),
     path('editeaza/<int:pk>/', views.editeaza_cheltuiala, name='editeaza_cheltuiala'),

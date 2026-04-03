@@ -72,6 +72,16 @@
     .stat-general { border-left-color: var(--success); }
     .stat-transactions { border-left-color: var(--danger); }
     .stat-budget { border-left-color: var(--accent); }
+
+    .forecast-item {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--bg-card);
+    }
+
+    .forecast-message {
+        font-weight: 600;
+    }
 </style>
 {% endblock %}
 
@@ -131,6 +141,74 @@
                 <span class="stat-icon cat-subscriptions"><i class="bi bi-piggy-bank"></i></span>
             </div>
         </div>
+    </div>
+</div>
+
+<div id="forecast-alerts" class="card mb-4 shadow-sm fade-in">
+    <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="fw-semibold"><i class="bi bi-bell me-2"></i>Alerte &amp; Forecast</span>
+        {% if forecast_alerts %}
+            <span class="badge bg-danger">{{ forecast_alerts|length }}</span>
+        {% endif %}
+    </div>
+    <div class="card-body px-4 pb-4">
+        {% if forecast_alerts %}
+            <div class="d-grid gap-3">
+                {% for alerta in forecast_alerts %}
+                    <div class="forecast-item p-3">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                            <div>
+                                <div class="forecast-message">
+                                    {% if alerta.tip == 'depasire_iminenta' %}🔴{% elif alerta.tip == 'ritm_alert' %}🟡{% elif alerta.tip == 'economie_posibila' %}🟢{% else %}🔵{% endif %}
+                                    {{ alerta.mesaj }}
+                                </div>
+                                <div class="small text-body-secondary mt-1">{{ alerta.actiune_recomandata }}</div>
+                                {% if alerta.categorie %}
+                                    <div class="small text-body-secondary mt-1">Categorie: {{ alerta.categorie.nume }}</div>
+                                {% endif %}
+                                {% if alerta.suma_implicata %}
+                                    <div class="small text-body-secondary">Suma implicată: {{ alerta.suma_implicata|floatformat:2 }} RON</div>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% if alerta.tip == 'depasire_iminenta' or alerta.tip == 'ritm_alert' %}
+                                    {% if alerta.categorie_id %}
+                                        <a href="{% url 'lista_cheltuieli' %}?categorie={{ alerta.categorie_id }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-list-ul me-1"></i>Vezi categoria
+                                        </a>
+                                    {% else %}
+                                        <a href="{% url 'lista_cheltuieli' %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-list-ul me-1"></i>Vezi cheltuieli
+                                        </a>
+                                    {% endif %}
+                                {% elif alerta.tip == 'recurenta_detectata' %}
+                                    <form method="post" action="{% url 'marca_citita' alerta.pk %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.path }}#forecast-alerts">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-check2-circle me-1"></i>Marchează ca așteptat
+                                        </button>
+                                    </form>
+                                {% endif %}
+
+                                <form method="post" action="{% url 'marca_citita' alerta.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.path }}#forecast-alerts">
+                                    <button type="submit" class="btn btn-sm btn-outline-dark">
+                                        <i class="bi bi-check2 me-1"></i>Marchează ca citită
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-3">
+                <div class="fw-semibold fs-5">Totul e în regulă! ✅</div>
+                <div class="text-body-secondary small">Nu există alerte predictive noi.</div>
+            </div>
+        {% endif %}
     </div>
 </div>
 

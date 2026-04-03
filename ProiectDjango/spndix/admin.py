@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Categorie, Cheltuiala, Budget, AIAnaliza
+from .models import Categorie, Cheltuiala, Budget, AIAnaliza, ForecastAlert
 
 
 @admin.register(Categorie)
@@ -28,3 +28,10 @@ class AIAnalizaAdmin(admin.ModelAdmin):
     list_display = ('utilizator', 'luna', 'an', 'creat_la')
     list_filter = ('luna', 'an', 'utilizator')
     search_fields = ('utilizator__username', 'continut_analiza')
+
+
+@admin.register(ForecastAlert)
+class ForecastAlertAdmin(admin.ModelAdmin):
+    list_display = ('utilizator', 'tip', 'categorie', 'suma_implicata', 'zile_ramase', 'citita', 'creat_la')
+    list_filter = ('tip', 'citita', 'creat_la', 'utilizator')
+    search_fields = ('utilizator__username', 'mesaj', 'actiune_recomandata', 'categorie__nume')

@@ -36,6 +36,14 @@ OBIECTIV_CHOICES = [
 ]
 
 
+TIP_ALERTA_CHOICES = [
+    ('depasire_iminenta', 'Depășire iminentă'),
+    ('ritm_alert', 'Ritm alert'),
+    ('economie_posibila', 'Economie posibilă'),
+    ('recurenta_detectata', 'Recurență detectată'),
+]
+
+
 class UserProfile(models.Model):
     utilizator = models.OneToOneField(User, on_delete=models.CASCADE)
     tip_gospodarie = models.CharField(max_length=20, choices=TIP_GOSPODARIE_CHOICES, default='single')
@@ -130,3 +138,23 @@ class AIAnaliza(models.Model):
                 name='unique_ai_analysis_per_month_year',
             )
         ]
+
+
+class ForecastAlert(models.Model):
+    utilizator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='forecast_alerts')
+    categorie = models.ForeignKey(Categorie, on_delete=models.SET_NULL, null=True, blank=True)
+    tip = models.CharField(max_length=30, choices=TIP_ALERTA_CHOICES)
+    mesaj = models.TextField()
+    suma_implicata = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    zile_ramase = models.IntegerField(null=True, blank=True)
+    actiune_recomandata = models.TextField()
+    citita = models.BooleanField(default=False)
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.utilizator.username} - {self.get_tip_display()}"
+
+    class Meta:
+        verbose_name = 'Alertă forecast'
+        verbose_name_plural = 'Alerte forecast'
+        ordering = ['citita', '-creat_la']

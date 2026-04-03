@@ -1,0 +1,259 @@
+[
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$N7a7TlD8WIrCoG63KywEHW$g9G/ngchCby+7VyEps1Zo57uHHeU0vX5xOD3DSxY6to=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "",
+    "last_name": "",
+    "email": "admin@spndix.local",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-04-03T08:14:05.229Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "spndix.userprofile",
+  "pk": 1,
+  "fields": {
+    "utilizator": [
+      "admin"
+    ],
+    "tip_gospodarie": "single",
+    "nr_persoane": 1,
+    "are_copii": false,
+    "venit_lunar": null,
+    "obiectiv": "stabilitate",
+    "creat_la": "2026-04-03T08:14:06.063Z"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 1,
+  "fields": {
+    "nume": "Food & Groceries",
+    "descriere": "Esențiale",
+    "culoare": "#2ecc71"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 2,
+  "fields": {
+    "nume": "Rent / Mortgage",
+    "descriere": "Esențiale",
+    "culoare": "#e74c3c"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 3,
+  "fields": {
+    "nume": "Utilities (electricity, water, gas)",
+    "descriere": "Esențiale",
+    "culoare": "#3498db"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 4,
+  "fields": {
+    "nume": "Internet & Phone",
+    "descriere": "Esențiale",
+    "culoare": "#2980b9"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 5,
+  "fields": {
+    "nume": "Transportation (fuel, bus, taxi)",
+    "descriere": "Esențiale",
+    "culoare": "#16a085"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 6,
+  "fields": {
+    "nume": "Healthcare & Medicine",
+    "descriere": "Esențiale",
+    "culoare": "#1abc9c"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 7,
+  "fields": {
+    "nume": "Clothing & Accessories",
+    "descriere": "Personale",
+    "culoare": "#8e44ad"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 8,
+  "fields": {
+    "nume": "Personal Care (haircut, cosmetics)",
+    "descriere": "Personale",
+    "culoare": "#9b59b6"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 9,
+  "fields": {
+    "nume": "Gym & Sports",
+    "descriere": "Personale",
+    "culoare": "#27ae60"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 10,
+  "fields": {
+    "nume": "Education & Books",
+    "descriere": "Personale",
+    "culoare": "#f39c12"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 11,
+  "fields": {
+    "nume": "Dining Out & Cafes",
+    "descriere": "Timp liber",
+    "culoare": "#d35400"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 12,
+  "fields": {
+    "nume": "Entertainment (cinema, concerts)",
+    "descriere": "Timp liber",
+    "culoare": "#9b59b6"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 13,
+  "fields": {
+    "nume": "Travel & Vacation",
+    "descriere": "Timp liber",
+    "culoare": "#f1c40f"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 14,
+  "fields": {
+    "nume": "Hobbies",
+    "descriere": "Timp liber",
+    "culoare": "#7f8c8d"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 15,
+  "fields": {
+    "nume": "Subscriptions (Netflix, Spotify)",
+    "descriere": "Timp liber",
+    "culoare": "#34495e"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 16,
+  "fields": {
+    "nume": "Savings",
+    "descriere": "Financiare",
+    "culoare": "#f1c40f"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 17,
+  "fields": {
+    "nume": "Loan Payments",
+    "descriere": "Financiare",
+    "culoare": "#c0392b"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 18,
+  "fields": {
+    "nume": "Insurance",
+    "descriere": "Financiare",
+    "culoare": "#7d3c98"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 19,
+  "fields": {
+    "nume": "Taxes & Fees",
+    "descriere": "Financiare",
+    "culoare": "#e67e22"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 20,
+  "fields": {
+    "nume": "Investments",
+    "descriere": "Financiare",
+    "culoare": "#2c3e50"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 21,
+  "fields": {
+    "nume": "Gifts & Donations",
+    "descriere": "Diverse",
+    "culoare": "#e84393"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 22,
+  "fields": {
+    "nume": "Pet Care",
+    "descriere": "Diverse",
+    "culoare": "#6c5ce7"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 23,
+  "fields": {
+    "nume": "Home & Repairs",
+    "descriere": "Diverse",
+    "culoare": "#95a5a6"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 24,
+  "fields": {
+    "nume": "Electronics & Tech",
+    "descriere": "Diverse",
+    "culoare": "#00b894"
+  }
+},
+{
+  "model": "spndix.categorie",
+  "pk": 25,
+  "fields": {
+    "nume": "Other",
+    "descriere": "Diverse",
+    "culoare": "#636e72"
+  }
+}
+]

@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
+import dj_database_url
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv()
 
 
-SECRET_KEY = 'django-insecure-npcv*b@rs3_e0hx)he2i=l68-_i+4v+=n0d^fuafi%b$ts0ig6'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'fallback-key-doar-pentru-dev')
 
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
@@ -49,6 +50,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'spndix.context_processors.unread_forecast_alerts',
             ],
         },
     },
@@ -57,10 +59,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'ProiectDjango.wsgi.application'
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
 
 AUTH_PASSWORD_VALIDATORS = [

@@ -7,6 +7,7 @@ cffi==2.0.0
 charset-normalizer==3.4.6
 cryptography==46.0.6
 distro==1.9.0
+dj-database-url
 Django==6.0.3
 docstring_parser==0.17.0
 et_xmlfile==2.0.0
@@ -31,12 +32,13 @@ packaging==26.0
 pillow==12.1.1
 proto-plus==1.27.2
 protobuf==5.29.6
+psycopg2-binary
 pyasn1==0.6.3
 pyasn1_modules==0.4.2
 pycparser==3.0
 pydantic==2.12.5
 pydantic_core==2.41.5
-PyMuPDF==1.27.2.2
+pypdf
 pyparsing==3.3.2
 python-dotenv==1.2.2
 reportlab==4.4.10

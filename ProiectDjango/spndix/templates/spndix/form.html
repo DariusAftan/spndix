@@ -49,6 +49,24 @@
         min-height: 50px;
         padding-inline: 1.4rem;
     }
+
+    .scan-cta {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--bg-primary) 88%, transparent), color-mix(in srgb, var(--accent) 12%, transparent));
+    }
+
+    .scan-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: color-mix(in srgb, var(--accent) 18%, transparent);
+        color: var(--accent);
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
 </style>
 {% endblock %}
 
@@ -59,6 +77,22 @@
             <h4 class="mb-0"><i class="bi bi-pencil-square me-2"></i>{{ titlu }}</h4>
             <span class="text-body-secondary small">Completează detaliile și salvează</span>
         </div>
+
+        {% if show_scan_receipt_cta %}
+            <div class="scan-cta p-3 mb-3 d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="scan-icon"><i class="bi bi-upc-scan"></i></span>
+                    <div>
+                        <div class="fw-semibold">Ai bonul la îndemână?</div>
+                        <div class="text-body-secondary small">Scanează-l automat și completezi formularul în câteva secunde.</div>
+                    </div>
+                </div>
+                <a href="{% url 'scaneaza_bon' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-camera me-1"></i>Scanează bon
+                </a>
+            </div>
+        {% endif %}
+
         <form method="post" class="row g-3" id="dynamicFloatingForm">
             {% csrf_token %}
             {% for field in form %}
