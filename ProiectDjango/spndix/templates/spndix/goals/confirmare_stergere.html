@@ -1,0 +1,29 @@
+{% extends 'spndix/base.html' %}
+
+{% block titlu %}Șterge goal{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent border-0">
+                <h4 class="mb-0 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Confirmare ștergere goal</h4>
+            </div>
+            <div class="card-body text-center">
+                <p class="mb-2">Ești sigur că vrei să ștergi goal-ul:</p>
+                <p class="fw-semibold fs-4 mb-1">{{ goal.titlu }}</p>
+                <p class="text-body-secondary mb-4">{{ goal.suma_curenta|floatformat:2 }} / {{ goal.suma_tinta|floatformat:2 }} RON</p>
+                <form method="post" class="d-flex justify-content-center gap-2 flex-wrap">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i>Da, șterge
+                    </button>
+                    <a href="{% url 'lista_goals' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>Anulează
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

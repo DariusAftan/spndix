@@ -82,6 +82,15 @@
     .forecast-message {
         font-weight: 600;
     }
+
+    .goal-mini + .goal-mini {
+        margin-top: 0.75rem;
+    }
+
+    .goal-mini .progress {
+        height: 8px;
+        background: var(--bg-secondary);
+    }
 </style>
 {% endblock %}
 
@@ -141,6 +150,38 @@
                 <span class="stat-icon cat-subscriptions"><i class="bi bi-piggy-bank"></i></span>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="card mb-4 shadow-sm fade-in">
+    <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="fw-semibold"><i class="bi bi-trophy me-2"></i>Goals</span>
+        <a href="{% url 'lista_goals' %}" class="btn btn-outline-dark btn-sm">Vezi toate goals</a>
+    </div>
+    <div class="card-body px-4 pb-4">
+        <div class="mb-3">
+            <div class="small text-body-secondary">Total economisit în goals active</div>
+            <div class="fw-semibold fs-5">{{ total_economisit_goals|floatformat:2 }} RON</div>
+        </div>
+        {% if goals_top %}
+            {% for item in goals_top %}
+                <div class="goal-mini">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="fw-semibold"><i class="bi {{ item.goal.icon|default:'bi-piggy-bank' }} me-2"></i>{{ item.goal.titlu }}</div>
+                        <span class="small text-body-secondary">{{ item.procent }}%</span>
+                    </div>
+                    <div class="progress mb-1">
+                        <div class="progress-bar" role="progressbar" style="width: {{ item.procent }}%; background: {{ item.goal.culoare }};"></div>
+                    </div>
+                    <div class="d-flex justify-content-between small text-body-secondary">
+                        <span>{{ item.suma_curenta|floatformat:2 }} / {{ item.suma_tinta|floatformat:2 }} RON</span>
+                        <span>+{{ item.contributie_saptamana|floatformat:2 }} RON săptămâna asta</span>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-body-secondary small">Nu ai goals active încă. Creează primul goal ca să urmărești progresul.</div>
+        {% endif %}
     </div>
 </div>
 

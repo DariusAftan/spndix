@@ -1,7 +1,24 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import Cheltuiala, Categorie, Budget, AIAnaliza, UserProfile, ForecastAlert, LUNA_CHOICES
-from .forms import CheltuialaForm, RegisterForm, BudgetForm, UserProfileForm
+from .models import (
+    Cheltuiala,
+    Categorie,
+    Budget,
+    AIAnaliza,
+    UserProfile,
+    ForecastAlert,
+    SavingsGoal,
+    GoalContribution,
+    LUNA_CHOICES,
+)
+from .forms import (
+    CheltuialaForm,
+    RegisterForm,
+    BudgetForm,
+    UserProfileForm,
+    SavingsGoalForm,
+    GoalContributionForm,
+)
 from django.contrib import messages
 from django.contrib.auth import login
 from django.db.models import Sum
@@ -293,6 +310,66 @@ def calculate_forecasts(utilizator):
         .select_related('categorie')
         .order_by('-creat_la')[:8]
     )
+
+
+def procent_goal(suma_curenta, suma_tinta):
+    suma_tinta = Decimal(suma_tinta or 0)
+    if suma_tinta <= 0:
+        return Decimal('0')
+    return (Decimal(suma_curenta or 0) / suma_tinta) * Decimal('100')
+
+
+def construieste_goal_status(goal, contributii_saptamana_map=None):
+    azi = timezone.localdate()
+    suma_tinta = Decimal(goal.suma_tinta or 0)
+    suma_curenta = Decimal(goal.suma_curenta or 0)
+    procent_real = procent_goal(suma_curenta, suma_tinta)
+    procent_limitat = min(procent_real, Decimal('100'))
+    suma_ramasa = rotunjeste_bani(max(suma_tinta - suma_curenta, Decimal('0')))
+    contributie_saptamana = Decimal('0')
+    if contributii_saptamana_map is not None:
+        contributie_saptamana = Decimal(contributii_saptamana_map.get(goal.pk, Decimal('0')) or 0)
+
+    zile_ramase = None
+    if goal.data_tinta:
+        zile_ramase = (goal.data_tinta - azi).days
+
+    milestones = []
+    for prag in (25, 50, 75, 100):
+        milestones.append({'prag': prag, 'atins': procent_real >= Decimal(prag)})
+
+    return {
+        'goal': goal,
+        'suma_tinta': suma_tinta,
+        'suma_curenta': suma_curenta,
+        'suma_ramasa': suma_ramasa,
+        'procent_real': float(procent_real),
+        'procent': float(procent_limitat.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)),
+        'zile_ramase': zile_ramase,
+        'contributie_saptamana': rotunjeste_bani(contributie_saptamana),
+        'milestones': milestones,
+        'completat': suma_tinta > 0 and suma_curenta >= suma_tinta,
+    }
+
+
+def notifica_milestone_goal(goal, procent_inainte, procent_dupa):
+    azi = timezone.localdate()
+    zile_ramase = (goal.data_tinta - azi).days if goal.data_tinta else None
+    suma_ramasa = rotunjeste_bani(max(Decimal(goal.suma_tinta or 0) - Decimal(goal.suma_curenta or 0), Decimal('0')))
+
+    for prag in (25, 50, 75, 100):
+        if procent_inainte < prag <= procent_dupa:
+            mesaj = f"Ai atins {prag}% din goal-ul '{goal.titlu}'! Mai ai nevoie de {suma_ramasa} RON."
+            actiune = f"Continuă contribuțiile pentru '{goal.titlu}' până atingi ținta completă."
+            creeaza_alerta_daca_nu_exista(
+                utilizator=goal.utilizator,
+                categorie=None,
+                tip='economie_posibila',
+                mesaj=mesaj,
+                suma_implicata=suma_ramasa,
+                zile_ramase=zile_ramase,
+                actiune_recomandata=actiune,
+            )
 
 
 def obtine_filtre_luna_an(request):
@@ -885,6 +962,23 @@ def dashboard(request):
         bar_data.append(float(total))
 
     forecast_alerts = calculate_forecasts(request.user)
+    goals_active = SavingsGoal.objects.filter(utilizator=request.user, activ=True)
+    inceput_saptamana = timezone.localdate() - timedelta(days=6)
+    contributii_saptamana = GoalContribution.objects.filter(
+        goal__utilizator=request.user,
+        goal__activ=True,
+        data__gte=inceput_saptamana,
+    ).values('goal_id').annotate(total=Sum('suma'))
+    contributii_saptamana_map = {
+        item['goal_id']: Decimal(item['total'] or 0)
+        for item in contributii_saptamana
+    }
+    goals_top = [
+        construieste_goal_status(goal, contributii_saptamana_map)
+        for goal in goals_active.order_by('-creat_la')
+    ]
+    goals_top = sorted(goals_top, key=lambda item: item['procent_real'], reverse=True)[:3]
+    total_economisit_goals = goals_active.aggregate(total=Sum('suma_curenta'))['total'] or Decimal('0')
 
     context = {
         'total_luna': total_luna,
@@ -898,6 +992,9 @@ def dashboard(request):
         'bar_data': json.dumps(bar_data),
         'luna_curenta': azi.strftime('%B %Y'),
         'forecast_alerts': forecast_alerts,
+        'goals_top': goals_top,
+        'total_economisit_goals': rotunjeste_bani(total_economisit_goals),
+        'goals_active_count': goals_active.count(),
     }
     return render(request, 'spndix/dashboard.html', context)
 
@@ -913,6 +1010,111 @@ def marca_citita(request, pk):
     if next_url:
         return redirect(next_url)
     return redirect('dashboard')
+
+
+@login_required
+def lista_goals(request):
+    goals = SavingsGoal.objects.filter(utilizator=request.user).order_by('-activ', 'data_tinta', '-creat_la')
+    inceput_saptamana = timezone.localdate() - timedelta(days=6)
+    contributii_saptamana = GoalContribution.objects.filter(
+        goal__utilizator=request.user,
+        data__gte=inceput_saptamana,
+    ).values('goal_id').annotate(total=Sum('suma'))
+    contributii_saptamana_map = {
+        item['goal_id']: Decimal(item['total'] or 0)
+        for item in contributii_saptamana
+    }
+
+    goal_cards = [construieste_goal_status(goal, contributii_saptamana_map) for goal in goals]
+    total_economisit = SavingsGoal.objects.filter(
+        utilizator=request.user,
+        activ=True,
+    ).aggregate(total=Sum('suma_curenta'))['total'] or Decimal('0')
+
+    context = {
+        'goal_cards': goal_cards,
+        'total_economisit': rotunjeste_bani(total_economisit),
+    }
+    return render(request, 'spndix/goals/lista.html', context)
+
+
+@login_required
+def adauga_goal(request):
+    if request.method == 'POST':
+        form = SavingsGoalForm(request.POST)
+        if form.is_valid():
+            goal = form.save(commit=False)
+            goal.utilizator = request.user
+            goal.save()
+            messages.success(request, f"Goal-ul '{goal.titlu}' a fost creat.")
+            return redirect('lista_goals')
+    else:
+        form = SavingsGoalForm()
+
+    return render(request, 'spndix/form.html', {'form': form, 'titlu': 'Adaugă Goal', 'cancel_url': 'lista_goals'})
+
+
+@login_required
+def editeaza_goal(request, pk):
+    goal = get_object_or_404(SavingsGoal, pk=pk, utilizator=request.user)
+    if request.method == 'POST':
+        form = SavingsGoalForm(request.POST, instance=goal)
+        if form.is_valid():
+            goal = form.save()
+            messages.success(request, f"Goal-ul '{goal.titlu}' a fost actualizat.")
+            return redirect('lista_goals')
+    else:
+        form = SavingsGoalForm(instance=goal)
+
+    return render(request, 'spndix/form.html', {'form': form, 'titlu': 'Editează Goal', 'cancel_url': 'lista_goals'})
+
+
+@login_required
+def sterge_goal(request, pk):
+    goal = get_object_or_404(SavingsGoal, pk=pk, utilizator=request.user)
+    if request.method == 'POST':
+        titlu = goal.titlu
+        goal.delete()
+        messages.success(request, f"Goal-ul '{titlu}' a fost șters.")
+        return redirect('lista_goals')
+
+    return render(request, 'spndix/goals/confirmare_stergere.html', {'goal': goal})
+
+
+@login_required
+def adauga_contributie(request, pk):
+    goal = get_object_or_404(SavingsGoal, pk=pk, utilizator=request.user)
+    contributii = goal.contributii.all()[:15]
+    goal_status = construieste_goal_status(goal)
+
+    if request.method == 'POST':
+        form = GoalContributionForm(request.POST)
+        if form.is_valid():
+            procent_inainte = procent_goal(goal.suma_curenta, goal.suma_tinta)
+
+            contributie = form.save(commit=False)
+            contributie.goal = goal
+            contributie.data = timezone.localdate()
+            contributie.save()
+
+            goal.suma_curenta = rotunjeste_bani(Decimal(goal.suma_curenta or 0) + Decimal(contributie.suma or 0))
+            goal.save(update_fields=['suma_curenta'])
+
+            procent_dupa = procent_goal(goal.suma_curenta, goal.suma_tinta)
+            notifica_milestone_goal(goal, procent_inainte, procent_dupa)
+
+            messages.success(request, f"Ai adăugat {rotunjeste_bani(contributie.suma)} RON la goal-ul '{goal.titlu}'.")
+            return redirect('lista_goals')
+    else:
+        form = GoalContributionForm()
+
+    context = {
+        'goal': goal,
+        'goal_status': goal_status,
+        'form': form,
+        'contributii': contributii,
+    }
+    return render(request, 'spndix/goals/adauga_contributie.html', context)
 
 @login_required
 def lista_cheltuieli(request):

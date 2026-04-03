@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Categorie, Cheltuiala, Budget, AIAnaliza, ForecastAlert
+from .models import Categorie, Cheltuiala, Budget, AIAnaliza, ForecastAlert, SavingsGoal, GoalContribution
 
 
 @admin.register(Categorie)
@@ -35,3 +35,17 @@ class ForecastAlertAdmin(admin.ModelAdmin):
     list_display = ('utilizator', 'tip', 'categorie', 'suma_implicata', 'zile_ramase', 'citita', 'creat_la')
     list_filter = ('tip', 'citita', 'creat_la', 'utilizator')
     search_fields = ('utilizator__username', 'mesaj', 'actiune_recomandata', 'categorie__nume')
+
+
+@admin.register(SavingsGoal)
+class SavingsGoalAdmin(admin.ModelAdmin):
+    list_display = ('titlu', 'utilizator', 'suma_curenta', 'suma_tinta', 'data_tinta', 'activ')
+    list_filter = ('activ', 'data_tinta', 'utilizator')
+    search_fields = ('titlu', 'utilizator__username')
+
+
+@admin.register(GoalContribution)
+class GoalContributionAdmin(admin.ModelAdmin):
+    list_display = ('goal', 'suma', 'data', 'creat_la')
+    list_filter = ('data', 'creat_la')
+    search_fields = ('goal__titlu', 'nota')

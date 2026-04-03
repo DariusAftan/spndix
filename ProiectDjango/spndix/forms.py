@@ -1,5 +1,5 @@
 from django import forms
-from .models import Cheltuiala, Categorie, Budget, LUNA_CHOICES, UserProfile
+from .models import Cheltuiala, Categorie, Budget, LUNA_CHOICES, UserProfile, SavingsGoal, GoalContribution
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
@@ -62,4 +62,29 @@ class UserProfileForm(forms.ModelForm):
             'are_copii': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'venit_lunar': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
             'obiectiv': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+
+class SavingsGoalForm(forms.ModelForm):
+    class Meta:
+        model = SavingsGoal
+        fields = ['titlu', 'suma_tinta', 'suma_curenta', 'data_tinta', 'culoare', 'icon', 'activ']
+        widgets = {
+            'titlu': forms.TextInput(attrs={'class': 'form-control'}),
+            'suma_tinta': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
+            'suma_curenta': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
+            'data_tinta': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'culoare': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
+            'icon': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'bi-piggy-bank'}),
+            'activ': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class GoalContributionForm(forms.ModelForm):
+    class Meta:
+        model = GoalContribution
+        fields = ['suma', 'nota']
+        widgets = {
+            'suma': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0.01}),
+            'nota': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: contribuție salariu'}),
         }

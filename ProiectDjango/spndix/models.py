@@ -158,3 +158,39 @@ class ForecastAlert(models.Model):
         verbose_name = 'Alertă forecast'
         verbose_name_plural = 'Alerte forecast'
         ordering = ['citita', '-creat_la']
+
+
+class SavingsGoal(models.Model):
+    utilizator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='savings_goals')
+    titlu = models.CharField(max_length=200)
+    suma_tinta = models.DecimalField(max_digits=12, decimal_places=2)
+    suma_curenta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    data_tinta = models.DateField(null=True, blank=True)
+    culoare = models.CharField(max_length=7, default='#6366f1')
+    icon = models.CharField(max_length=50, default='bi-piggy-bank')
+    activ = models.BooleanField(default=True)
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.titlu} - {self.utilizator.username}"
+
+    class Meta:
+        verbose_name = 'Savings goal'
+        verbose_name_plural = 'Savings goals'
+        ordering = ['-activ', 'data_tinta', '-creat_la']
+
+
+class GoalContribution(models.Model):
+    goal = models.ForeignKey(SavingsGoal, on_delete=models.CASCADE, related_name='contributii')
+    suma = models.DecimalField(max_digits=12, decimal_places=2)
+    nota = models.CharField(max_length=200, blank=True)
+    data = models.DateField()
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.goal.titlu} +{self.suma}"
+
+    class Meta:
+        verbose_name = 'Contribuție goal'
+        verbose_name_plural = 'Contribuții goals'
+        ordering = ['-data', '-creat_la']

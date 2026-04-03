@@ -1,0 +1,160 @@
+{% extends 'spndix/base.html' %}
+
+{% block titlu %}Goals - Spndix{% endblock %}
+
+{% block extra_head %}
+<style>
+    .goal-card {
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+    .goal-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .goal-card.goal-complete {
+        border-color: #16a34a;
+        background: color-mix(in srgb, #16a34a 12%, var(--bg-card));
+    }
+
+    .goal-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .milestone-chip {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: .2rem .55rem;
+        font-size: .78rem;
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+    }
+
+    .milestone-chip.reached {
+        border-color: rgba(22, 163, 74, .45);
+        background: color-mix(in srgb, #16a34a 15%, var(--bg-primary));
+        color: #16a34a;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="page-title mb-1"><i class="bi bi-trophy me-2"></i>Savings Goals</h2>
+        <p class="text-body-secondary mb-0">Urmărește milestone-uri și progresul săptămânal pentru fiecare obiectiv.</p>
+    </div>
+    <a href="{% url 'adauga_goal' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>Adaugă goal
+    </a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <div class="small text-body-secondary">Total economisit în goals active</div>
+            <div class="fw-semibold fs-4">{{ total_economisit|floatformat:2 }} RON</div>
+        </div>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-dark btn-sm">
+            <i class="bi bi-bar-chart me-1"></i>Înapoi la dashboard
+        </a>
+    </div>
+</div>
+
+{% if goal_cards %}
+    <div class="row g-3">
+        {% for item in goal_cards %}
+            <div class="col-lg-6 col-xl-4">
+                <div class="goal-card shadow-sm h-100 p-3 {% if item.completat %}goal-complete{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2 min-w-0">
+                            <span class="goal-icon" style="background: color-mix(in srgb, {{ item.goal.culoare }} 18%, transparent); color: {{ item.goal.culoare }};">
+                                <i class="bi {{ item.goal.icon|default:'bi-piggy-bank' }}"></i>
+                            </span>
+                            <div class="min-w-0">
+                                <div class="fw-semibold text-truncate">{{ item.goal.titlu }}</div>
+                                <div class="small text-body-secondary">{{ item.procent }}% completat</div>
+                            </div>
+                        </div>
+                        {% if item.completat %}
+                            <span class="badge bg-success">Completat 🎉</span>
+                        {% elif not item.goal.activ %}
+                            <span class="badge bg-secondary">Inactiv</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="progress mb-2" style="height: 10px; background: var(--bg-secondary);">
+                        <div class="progress-bar" role="progressbar" style="width: {{ item.procent }}%; background: {{ item.goal.culoare }};"></div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center small mb-1">
+                        <span>{{ item.suma_curenta|floatformat:2 }} / {{ item.suma_tinta|floatformat:2 }} RON</span>
+                        <span class="text-body-secondary">Rămas: {{ item.suma_ramasa|floatformat:2 }} RON</span>
+                    </div>
+
+                    <div class="small text-body-secondary mb-3">
+                        {% if item.zile_ramase is not None %}
+                            {% if item.zile_ramase >= 0 %}
+                                {{ item.zile_ramase }} zile rămase până la {{ item.goal.data_tinta|date:'d.m.Y' }}
+                            {% else %}
+                                Termen depășit (ținta era {{ item.goal.data_tinta|date:'d.m.Y' }})
+                            {% endif %}
+                        {% else %}
+                            Fără dată țintă setată
+                        {% endif %}
+                        · +{{ item.contributie_saptamana|floatformat:2 }} RON săptămâna asta
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        {% for milestone in item.milestones %}
+                            <span class="milestone-chip {% if milestone.atins %}reached{% endif %}">
+                                {% if milestone.atins %}
+                                    <i class="bi bi-check-circle-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-circle"></i>
+                                {% endif %}
+                                {{ milestone.prag }}%
+                            </span>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap mt-auto">
+                        <a href="{% url 'adauga_contributie' item.goal.pk %}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-cash-coin me-1"></i>Adaugă bani
+                        </a>
+                        <a href="{% url 'editeaza_goal' item.goal.pk %}" class="btn btn-sm btn-outline-dark">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'sterge_goal' item.goal.pk %}" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-trophy display-1 text-body-secondary"></i>
+            <p class="text-body-secondary mt-3 mb-0">Nu ai niciun goal creat încă.</p>
+            <a href="{% url 'adauga_goal' %}" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-circle me-1"></i>Creează primul goal
+            </a>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

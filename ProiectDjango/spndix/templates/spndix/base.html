@@ -456,6 +456,7 @@
                 <ul class="nav center-nav desktop-nav flex-nowrap align-items-center justify-content-center gap-1 mx-auto">
                     <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-house-door"></i> Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_cheltuieli' %}"><i class="bi bi-receipt"></i> Cheltuieli</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'lista_goals' %}"><i class="bi bi-trophy"></i> Goals</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'analiza_ai' %}"><i class="bi bi-robot"></i> AI</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_bugete' %}"><i class="bi bi-piggy-bank"></i> Bugete</a></li>
                 </ul>
@@ -517,6 +518,7 @@
         <a class="btn btn-light text-start mb-2" href="{% url 'dashboard' %}"><i class="bi bi-house-door me-2"></i>Dashboard</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'lista_cheltuieli' %}"><i class="bi bi-receipt me-2"></i>Cheltuieli</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'adauga_cheltuiala' %}"><i class="bi bi-plus-circle me-2"></i>Adaugă cheltuială</a>
+        <a class="btn btn-light text-start mb-2" href="{% url 'lista_goals' %}"><i class="bi bi-trophy me-2"></i>Goals</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'lista_bugete' %}"><i class="bi bi-piggy-bank me-2"></i>Bugete</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'analiza_ai' %}"><i class="bi bi-robot me-2"></i>Analiză AI</a>
         <a class="btn btn-light text-start mb-2 d-flex justify-content-between align-items-center" href="{% url 'dashboard' %}#forecast-alerts">
@@ -560,6 +562,7 @@
     <div class="d-flex justify-content-between align-items-center gap-1">
         <a href="{% url 'dashboard' %}"><i class="bi bi-house-door"></i><span>Dashboard</span></a>
         <a href="{% url 'lista_cheltuieli' %}"><i class="bi bi-receipt"></i><span>Cheltuieli</span></a>
+        <a href="{% url 'lista_goals' %}"><i class="bi bi-trophy"></i><span>Goals</span></a>
         <a href="{% url 'adauga_cheltuiala' %}"><i class="bi bi-plus-circle"></i><span>Adaugă</span></a>
         <a href="{% url 'lista_bugete' %}"><i class="bi bi-piggy-bank"></i><span>Bugete</span></a>
         <a href="{% url 'profil' %}"><i class="bi bi-person-gear"></i><span>Profil</span></a>
