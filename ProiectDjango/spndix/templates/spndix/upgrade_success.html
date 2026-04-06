@@ -1,0 +1,24 @@
+{% extends 'spndix/base.html' %}
+
+{% block titlu %}Upgrade Confirmat - Spndix{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm mx-auto" style="max-width: 700px;">
+    <div class="card-body p-4 p-lg-5 text-center">
+        <div class="display-6 mb-3 text-success"><i class="bi bi-check2-circle"></i></div>
+        <h2 class="mb-2">Plata a fost procesată cu succes</h2>
+        <p class="text-body-secondary mb-4">
+            Contul tău a fost actualizat la planul
+            <span class="badge text-bg-primary">{{ plan_selectat|title }}</span>.
+        </p>
+        <div class="d-flex justify-content-center gap-2 flex-wrap">
+            <a href="{% url 'dashboard' %}" class="btn btn-primary">
+                <i class="bi bi-speedometer2 me-1"></i>Înapoi la Dashboard
+            </a>
+            <a href="{% url 'upgrade' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-stars me-1"></i>Vezi toate planurile
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

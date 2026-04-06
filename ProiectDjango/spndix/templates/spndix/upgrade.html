@@ -1,0 +1,126 @@
+{% extends 'spndix/base.html' %}
+
+{% block titlu %}Upgrade Plan - Spndix{% endblock %}
+
+{% block extra_head %}
+<style>
+    .pricing-shell {
+        background: radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 18%, transparent), transparent 45%);
+        border-radius: 22px;
+    }
+
+    .plan-card {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--bg-card);
+        box-shadow: var(--shadow);
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+    .plan-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .plan-card.recommended {
+        border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+        box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 25%, transparent);
+        position: relative;
+    }
+
+    .price-tag {
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .feature-list li + li {
+        margin-top: .5rem;
+    }
+
+    .testimonial-card {
+        border-radius: 16px;
+        border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+        background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pricing-shell p-4 p-lg-5 mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+            <h2 class="mb-2"><i class="bi bi-stars me-2"></i>Upgrade la Spndix Pro</h2>
+            <p class="text-body-secondary mb-0">Deblochează mai multă putere AI, exporturi nelimitate și experiență fără reclame.</p>
+        </div>
+        <span class="badge text-bg-dark">Plan curent: {{ plan_curent.get_plan_display|default:'Free' }}</span>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <div class="plan-card h-100 p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">Free</h5>
+                    <span class="badge bg-secondary">Starter</span>
+                </div>
+                <div class="price-tag mb-3">0 RON<span class="fs-6 fw-normal">/lună</span></div>
+                <ul class="feature-list list-unstyled small text-body-secondary mb-0">
+                    <li><i class="bi bi-check-circle text-success me-2"></i>2 analize AI/lună</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>1 export/lună (PDF sau Excel)</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>3 scanări bon/lună</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Subscriptions & Goals nelimitate</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>CRUD nelimitat</li>
+                    <li><i class="bi bi-exclamation-circle text-warning me-2"></i>Include banner promo</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="plan-card recommended h-100 p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">Pro</h5>
+                    <span class="badge bg-primary">Recomandat</span>
+                </div>
+                <div class="price-tag mb-3">10 RON<span class="fs-6 fw-normal">/lună</span></div>
+                <ul class="feature-list list-unstyled small text-body-secondary mb-3">
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Analize AI nelimitate (max 10/zi)</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Export nelimitat</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Scanări nelimitate (max 5/zi)</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Fără reclame</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Tot ce include planul Free</li>
+                </ul>
+                <a href="{% url 'checkout' 'pro' %}" class="btn btn-primary w-100">
+                    <i class="bi bi-lightning-charge-fill me-1"></i>Alege Pro
+                </a>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="plan-card h-100 p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">Family</h5>
+                    <span class="badge text-bg-warning">Echipă</span>
+                </div>
+                <div class="price-tag mb-3">20 RON<span class="fs-6 fw-normal">/lună</span></div>
+                <ul class="feature-list list-unstyled small text-body-secondary mb-3">
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Tot ce include planul Pro</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Până la 5 membri</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Buget comun</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Rapoarte per membru</li>
+                </ul>
+                <a href="{% url 'checkout' 'family' %}" class="btn btn-outline-dark w-100">
+                    <i class="bi bi-people-fill me-1"></i>Alege Family
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="testimonial-card p-3 p-lg-4 mb-4">
+    <div class="small text-body-secondary mb-1">Ce spun utilizatorii</div>
+    <blockquote class="mb-1 fw-semibold">
+        "Am economisit 300 RON în prima lună!"
+    </blockquote>
+    <div class="text-body-secondary small">- Ana M.</div>
+</div>
+{% endblock %}

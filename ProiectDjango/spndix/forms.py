@@ -1,5 +1,14 @@
 from django import forms
-from .models import Cheltuiala, Categorie, Budget, LUNA_CHOICES, UserProfile, SavingsGoal, GoalContribution
+from .models import (
+    Cheltuiala,
+    Categorie,
+    Budget,
+    LUNA_CHOICES,
+    UserProfile,
+    SavingsGoal,
+    GoalContribution,
+    Subscription,
+)
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
@@ -87,4 +96,20 @@ class GoalContributionForm(forms.ModelForm):
         widgets = {
             'suma': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0.01}),
             'nota': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: contribuție salariu'}),
+        }
+
+
+class SubscriptionForm(forms.ModelForm):
+    class Meta:
+        model = Subscription
+        fields = ['nume', 'suma_estimata', 'ziua_lunii', 'categorie']
+        widgets = {
+            'nume': forms.TextInput(attrs={'class': 'form-control'}),
+            'suma_estimata': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': 0}),
+            'ziua_lunii': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 31}),
+            'categorie': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+        labels = {
+            'ziua_lunii': 'Ziua debitării',
         }

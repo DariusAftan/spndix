@@ -36,11 +36,26 @@ OBIECTIV_CHOICES = [
 ]
 
 
+PLAN_CHOICES = [
+    ('free', 'Free'),
+    ('pro', 'Pro'),
+    ('family', 'Family'),
+]
+
+
 TIP_ALERTA_CHOICES = [
     ('depasire_iminenta', 'Depășire iminentă'),
     ('ritm_alert', 'Ritm alert'),
     ('economie_posibila', 'Economie posibilă'),
     ('recurenta_detectata', 'Recurență detectată'),
+    ('abonament_iminent', 'Abonament iminent'),
+]
+
+
+FRECVENTA_SUBSCRIPTION_CHOICES = [
+    ('lunar', 'Lunar'),
+    ('anual', 'Anual'),
+    ('saptamanal', 'Săptămânal'),
 ]
 
 
@@ -65,6 +80,29 @@ class UserProfile(models.Model):
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.create(utilizator=instance)
+
+
+class UserPlan(models.Model):
+    utilizator = models.OneToOneField(User, on_delete=models.CASCADE, related_name='userplan')
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default='free')
+    stripe_customer_id = models.CharField(max_length=255, null=True, blank=True)
+    stripe_subscription_id = models.CharField(max_length=255, null=True, blank=True)
+    activ = models.BooleanField(default=True)
+    data_expirare = models.DateField(null=True, blank=True)
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.utilizator.username} - {self.get_plan_display()}"
+
+    class Meta:
+        verbose_name = 'Plan utilizator'
+        verbose_name_plural = 'Planuri utilizatori'
+
+
+@receiver(post_save, sender=User)
+def create_user_plan(sender, instance, created, **kwargs):
+    if created:
+        UserPlan.objects.create(utilizator=instance, plan='free')
 
 
 class Categorie(models.Model):
@@ -194,3 +232,57 @@ class GoalContribution(models.Model):
         verbose_name = 'Contribuție goal'
         verbose_name_plural = 'Contribuții goals'
         ordering = ['-data', '-creat_la']
+
+
+class ExportLog(models.Model):
+    TIP_CHOICES = [
+        ('pdf', 'PDF'),
+        ('excel', 'Excel'),
+    ]
+
+    utilizator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='export_logs')
+    tip = models.CharField(max_length=20, choices=TIP_CHOICES)
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.utilizator.username} - {self.tip}"
+
+    class Meta:
+        verbose_name = 'Log export'
+        verbose_name_plural = 'Loguri export'
+        ordering = ['-creat_la']
+
+
+class ScanareLog(models.Model):
+    utilizator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='scanare_logs')
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.utilizator.username} - scanare"
+
+    class Meta:
+        verbose_name = 'Log scanare'
+        verbose_name_plural = 'Loguri scanare'
+        ordering = ['-creat_la']
+
+
+class Subscription(models.Model):
+    utilizator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='subscriptions')
+    nume = models.CharField(max_length=200)
+    suma_estimata = models.DecimalField(max_digits=12, decimal_places=2)
+    frecventa = models.CharField(max_length=20, choices=FRECVENTA_SUBSCRIPTION_CHOICES, default='lunar')
+    ziua_lunii = models.IntegerField(null=True, blank=True)
+    categorie = models.ForeignKey(Categorie, on_delete=models.SET_NULL, null=True, blank=True)
+    activ = models.BooleanField(default=True)
+    detectat_automat = models.BooleanField(default=False)
+    ultima_plata = models.DateField(null=True, blank=True)
+    urmatoarea_plata = models.DateField(null=True, blank=True)
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.nume} - {self.utilizator.username}"
+
+    class Meta:
+        verbose_name = 'Abonament'
+        verbose_name_plural = 'Abonamente'
+        ordering = ['-activ', 'urmatoarea_plata', 'nume']

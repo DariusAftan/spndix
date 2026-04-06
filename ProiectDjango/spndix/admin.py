@@ -1,5 +1,17 @@
 from django.contrib import admin
-from .models import Categorie, Cheltuiala, Budget, AIAnaliza, ForecastAlert, SavingsGoal, GoalContribution
+from .models import (
+    Categorie,
+    Cheltuiala,
+    Budget,
+    AIAnaliza,
+    ForecastAlert,
+    SavingsGoal,
+    GoalContribution,
+    ExportLog,
+    ScanareLog,
+    Subscription,
+    UserPlan,
+)
 
 
 @admin.register(Categorie)
@@ -49,3 +61,39 @@ class GoalContributionAdmin(admin.ModelAdmin):
     list_display = ('goal', 'suma', 'data', 'creat_la')
     list_filter = ('data', 'creat_la')
     search_fields = ('goal__titlu', 'nota')
+
+
+@admin.register(Subscription)
+class SubscriptionAdmin(admin.ModelAdmin):
+    list_display = (
+        'nume',
+        'utilizator',
+        'suma_estimata',
+        'frecventa',
+        'urmatoarea_plata',
+        'activ',
+        'detectat_automat',
+    )
+    list_filter = ('frecventa', 'activ', 'detectat_automat', 'utilizator')
+    search_fields = ('nume', 'utilizator__username', 'categorie__nume')
+
+
+@admin.register(UserPlan)
+class UserPlanAdmin(admin.ModelAdmin):
+    list_display = ('utilizator', 'plan', 'activ', 'data_expirare', 'creat_la')
+    list_filter = ('plan', 'activ', 'creat_la')
+    search_fields = ('utilizator__username', 'stripe_customer_id', 'stripe_subscription_id')
+
+
+@admin.register(ExportLog)
+class ExportLogAdmin(admin.ModelAdmin):
+    list_display = ('utilizator', 'tip', 'creat_la')
+    list_filter = ('tip', 'creat_la')
+    search_fields = ('utilizator__username',)
+
+
+@admin.register(ScanareLog)
+class ScanareLogAdmin(admin.ModelAdmin):
+    list_display = ('utilizator', 'creat_la')
+    list_filter = ('creat_la',)
+    search_fields = ('utilizator__username',)

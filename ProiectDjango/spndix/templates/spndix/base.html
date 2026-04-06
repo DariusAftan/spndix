@@ -344,6 +344,37 @@
             padding: 0 5px;
         }
 
+        .plan-chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 700;
+            line-height: 1;
+            padding: .35rem .55rem;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+        }
+
+        .plan-chip.pro,
+        .plan-chip.family {
+            color: #fff;
+            border-color: transparent;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        }
+
+        .plan-chip.family {
+            background: linear-gradient(135deg, #0f766e, #0e7490);
+        }
+
+        .free-upgrade-banner {
+            border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+            background: linear-gradient(90deg, color-mix(in srgb, var(--warning) 18%, transparent), transparent);
+            border-radius: 14px;
+            margin-bottom: 16px;
+        }
+
         .fade-in { animation: fadeInUp 0.4s ease forwards; }
         .slide-up { animation: fadeInUp 0.4s ease forwards; }
 
@@ -457,6 +488,7 @@
                     <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-house-door"></i> Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_cheltuieli' %}"><i class="bi bi-receipt"></i> Cheltuieli</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_goals' %}"><i class="bi bi-trophy"></i> Goals</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'lista_subscriptions' %}"><i class="bi bi-repeat"></i> Subscriptions</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'analiza_ai' %}"><i class="bi bi-robot"></i> AI</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_bugete' %}"><i class="bi bi-piggy-bank"></i> Bugete</a></li>
                 </ul>
@@ -477,12 +509,15 @@
                         <button class="btn btn-light d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <span class="avatar-chip">{{ user.username|slice:":1"|upper }}</span>
                             <span class="d-none d-xl-inline">{{ user.username }}</span>
+                            <span class="plan-chip {{ current_user_plan_name }} d-none d-md-inline">{{ current_user_plan_name|upper }}</span>
                             <i class="bi bi-chevron-down small"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 p-2">
                             <li><a class="dropdown-item rounded-3" href="{% url 'profil' %}"><i class="bi bi-person-gear me-2"></i>Profil</a></li>
                             <li><a class="dropdown-item rounded-3" href="{% url 'scaneaza_bon' %}"><i class="bi bi-upc-scan me-2"></i>Scanează bon</a></li>
                             <li><a class="dropdown-item rounded-3" href="{% url 'adauga_cheltuiala' %}"><i class="bi bi-plus-circle me-2"></i>Adaugă cheltuială</a></li>
+                            <li><a class="dropdown-item rounded-3" href="{% url 'lista_subscriptions' %}"><i class="bi bi-repeat me-2"></i>Subscriptions</a></li>
+                            <li><a class="dropdown-item rounded-3" href="{% url 'upgrade' %}"><i class="bi bi-stars me-2"></i>Upgrade</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <form method="post" action="/accounts/logout/" class="px-2">
@@ -519,6 +554,8 @@
         <a class="btn btn-light text-start mb-2" href="{% url 'lista_cheltuieli' %}"><i class="bi bi-receipt me-2"></i>Cheltuieli</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'adauga_cheltuiala' %}"><i class="bi bi-plus-circle me-2"></i>Adaugă cheltuială</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'lista_goals' %}"><i class="bi bi-trophy me-2"></i>Goals</a>
+        <a class="btn btn-light text-start mb-2" href="{% url 'lista_subscriptions' %}"><i class="bi bi-repeat me-2"></i>Subscriptions</a>
+        <a class="btn btn-light text-start mb-2" href="{% url 'upgrade' %}"><i class="bi bi-stars me-2"></i>Upgrade</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'lista_bugete' %}"><i class="bi bi-piggy-bank me-2"></i>Bugete</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'analiza_ai' %}"><i class="bi bi-robot me-2"></i>Analiză AI</a>
         <a class="btn btn-light text-start mb-2 d-flex justify-content-between align-items-center" href="{% url 'dashboard' %}#forecast-alerts">
@@ -544,6 +581,16 @@
 
 <div class="app-shell">
     <div class="container slide-up">
+        {% if user.is_authenticated and current_user_plan_name == 'free' %}
+            <div class="free-upgrade-banner p-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
+                <div>
+                    <strong><i class="bi bi-gem me-1"></i>Plan Free activ</strong>
+                    <div class="small text-secondary">Treci la Pro pentru analize AI avansate, exporturi nelimitate și fără reclame.</div>
+                </div>
+                <a href="{% url 'upgrade' %}" class="btn btn-warning btn-sm"><i class="bi bi-arrow-up-right-circle me-1"></i>Upgrade Acum</a>
+            </div>
+        {% endif %}
+
         {% if messages %}
             {% for message in messages %}
                 <div class="alert alert-{{ message.tags }} alert-dismissible fade show fade-in">
@@ -563,6 +610,7 @@
         <a href="{% url 'dashboard' %}"><i class="bi bi-house-door"></i><span>Dashboard</span></a>
         <a href="{% url 'lista_cheltuieli' %}"><i class="bi bi-receipt"></i><span>Cheltuieli</span></a>
         <a href="{% url 'lista_goals' %}"><i class="bi bi-trophy"></i><span>Goals</span></a>
+        <a href="{% url 'lista_subscriptions' %}"><i class="bi bi-repeat"></i><span>Subs</span></a>
         <a href="{% url 'adauga_cheltuiala' %}"><i class="bi bi-plus-circle"></i><span>Adaugă</span></a>
         <a href="{% url 'lista_bugete' %}"><i class="bi bi-piggy-bank"></i><span>Bugete</span></a>
         <a href="{% url 'profil' %}"><i class="bi bi-person-gear"></i><span>Profil</span></a>

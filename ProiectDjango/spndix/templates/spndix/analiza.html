@@ -74,7 +74,11 @@
             </div>
             <div class="p-4" style="border:1px solid var(--border); border-radius: 16px; background: color-mix(in srgb, var(--bg-soft) 92%, transparent);">
                 <div class="analysis-text">
-                    {{ analiza.continut_analiza|linebreaks }}
+                    {% for paragraf in analiza.continut_analiza.splitlines %}
+                        {% if paragraf.strip %}
+                            <p class="mb-3">{{ paragraf }}</p>
+                        {% endif %}
+                    {% endfor %}
                 </div>
             </div>
         </div>

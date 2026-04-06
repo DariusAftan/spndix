@@ -5,10 +5,14 @@ from .models import (
     Categorie,
     Budget,
     AIAnaliza,
+    ExportLog,
+    ScanareLog,
     UserProfile,
+    UserPlan,
     ForecastAlert,
     SavingsGoal,
     GoalContribution,
+    Subscription,
     LUNA_CHOICES,
 )
 from .forms import (
@@ -18,7 +22,9 @@ from .forms import (
     UserProfileForm,
     SavingsGoalForm,
     GoalContributionForm,
+    SubscriptionForm,
 )
+from .plan_limits import check_limit, obtine_user_plan
 from django.contrib import messages
 from django.contrib.auth import login
 from django.db.models import Sum
@@ -27,6 +33,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.http import HttpResponse
+import io
 import json
 import base64
 import re
@@ -38,8 +45,8 @@ from datetime import date, timedelta
 from calendar import monthrange
 
 import PIL.Image
+import fitz
 from PIL import ImageOps, UnidentifiedImageError
-from pypdf import PdfReader
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -49,6 +56,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 import google.generativeai as genai
+import stripe
 
 
 def construieste_buget_dashboard(buget, utilizator):
@@ -94,6 +102,110 @@ def construieste_buget_dashboard(buget, utilizator):
 
 def rotunjeste_bani(valoare):
     return Decimal(valoare or 0).quantize(Decimal('0.01'))
+
+
+def curata_markdown(text):
+    text = text or ''
+    text = re.sub(r'#{1,6}\s+', '', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'__(.*?)__', r'\1', text)
+    return text.strip()
+
+
+def suma_lunara_subscription(subscription):
+    return rotunjeste_bani(subscription.suma_estimata)
+
+
+def ziua_reala_subscription(subscription, an, luna):
+    zi_setata = int(subscription.ziua_lunii or 1)
+    zi_setata = max(1, zi_setata)
+    zile_in_luna = monthrange(an, luna)[1]
+    return min(zi_setata, zile_in_luna)
+
+
+def urmatoarea_data_subscription(subscription, referinta=None):
+    referinta = referinta or timezone.localdate()
+    zi_curenta = ziua_reala_subscription(subscription, referinta.year, referinta.month)
+    data_curenta = date(referinta.year, referinta.month, zi_curenta)
+    if data_curenta >= referinta:
+        return data_curenta
+
+    if referinta.month == 12:
+        an_urmator = referinta.year + 1
+        luna_urmatoare = 1
+    else:
+        an_urmator = referinta.year
+        luna_urmatoare = referinta.month + 1
+
+    zi_urmatoare = ziua_reala_subscription(subscription, an_urmator, luna_urmatoare)
+    return date(an_urmator, luna_urmatoare, zi_urmatoare)
+
+
+def sincronizeaza_urmatoare_plati_subscriptions(utilizator, referinta=None):
+    referinta = referinta or timezone.localdate()
+    subscriptions = Subscription.objects.filter(utilizator=utilizator)
+
+    for subscription in subscriptions:
+        update_fields = []
+        if subscription.ziua_lunii is None or int(subscription.ziua_lunii) < 1:
+            subscription.ziua_lunii = 1
+            update_fields.append('ziua_lunii')
+
+        urmatoarea_plata = None
+        if subscription.activ:
+            urmatoarea_plata = urmatoarea_data_subscription(subscription, referinta=referinta)
+
+        if subscription.urmatoarea_plata != urmatoarea_plata:
+            subscription.urmatoarea_plata = urmatoarea_plata
+            update_fields.append('urmatoarea_plata')
+
+        if update_fields:
+            subscription.save(update_fields=update_fields)
+
+
+def auto_adauga_subscriptions_lunare(utilizator, azi=None):
+    azi = azi or timezone.localdate()
+    subscriptions = Subscription.objects.filter(utilizator=utilizator, activ=True).select_related('categorie')
+    create_count = 0
+
+    for subscription in subscriptions:
+        ziua_reala = ziua_reala_subscription(subscription, azi.year, azi.month)
+        data_scadenta = date(azi.year, azi.month, ziua_reala)
+
+        if data_scadenta != azi:
+            urmatoarea_plata = urmatoarea_data_subscription(subscription, referinta=azi)
+            if subscription.urmatoarea_plata != urmatoarea_plata:
+                subscription.urmatoarea_plata = urmatoarea_plata
+                subscription.save(update_fields=['urmatoarea_plata'])
+            continue
+
+        exista_cheltuiala_luna_curenta = Cheltuiala.objects.filter(
+            utilizator=utilizator,
+            titlu__iexact=subscription.nume,
+            data__year=azi.year,
+            data__month=azi.month,
+        ).exists()
+
+        if not exista_cheltuiala_luna_curenta:
+            Cheltuiala.objects.create(
+                utilizator=utilizator,
+                categorie=subscription.categorie,
+                titlu=subscription.nume,
+                suma=rotunjeste_bani(subscription.suma_estimata),
+                data=azi,
+                descriere='Abonament adaugat automat din Subscription Radar.',
+            )
+            create_count += 1
+
+        subscription.ultima_plata = azi
+        subscription.urmatoarea_plata = urmatoarea_data_subscription(
+            subscription,
+            referinta=azi + timedelta(days=1),
+        )
+        subscription.save(update_fields=['ultima_plata', 'urmatoarea_plata'])
+
+    return create_count
 
 
 def creeaza_alerta_daca_nu_exista(
@@ -499,6 +611,9 @@ def construieste_date_luna_precedenta(utilizator, luna, an):
         data__year=an_precedent,
     ).select_related('categorie').order_by('-data', '-id')
 
+    if not cheltuieli_precedente.exists():
+        return None
+
     cheltuieli_text = construieste_cheltuieli_detaliate(cheltuieli_precedente)
     totaluri_categorii = list(
         cheltuieli_precedente.values('categorie__nume')
@@ -534,7 +649,10 @@ def construieste_prompt_analiza(
     date_bugete,
     date_luna_precedenta,
 ):
-    return f"""
+    prompt = f"""
+Răspunde în text simplu fără Markdown, fără simboluri ### ** * _ sau alte formatări speciale.
+Folosește doar text simplu cu paragrafe separate.
+
 Ești un consilier financiar personal experimentat,
 nu un chatbot generic. Analizezi cheltuielile reale
 ale unui utilizator și dai sfaturi SPECIFICE bazate
@@ -552,9 +670,22 @@ CHELTUIELI LUNA {luna} {an}:
 
 BUGETE SETATE:
 {date_bugete}
+"""
 
-CHELTUIELI LUNA PRECEDENTĂ (pentru comparație):
+    if date_luna_precedenta:
+        prompt += f"""
+COMPARAȚIE CU LUNA PRECEDENTĂ:
 {date_luna_precedenta}
+Compară cheltuielile cu luna precedentă și identifică ce a crescut/scăzut.
+"""
+    else:
+        prompt += """
+NOTĂ: Nu există date din luna precedentă.
+Nu face comparații cu luna trecută.
+Analizează doar datele din luna curentă.
+"""
+
+    prompt += f"""
 
 REGULI STRICTE:
 1. NU da sfaturi generice - doar sfaturi bazate
@@ -588,6 +719,8 @@ STRUCTURĂ RĂSPUNS (respectă exact această structură):
 
 Răspunde în română, prietenos și direct.
 """
+
+    return prompt
 
 
 def genereaza_text_gemini(prompt):
@@ -641,66 +774,88 @@ def curata_json_text(text):
     return json.loads(curat)
 
 
+FORMATE_ACCEPTATE = [
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/webp',
+    'application/pdf',
+]
+
+
+def proceseaza_imagine_bon(fisier):
+    nume = (getattr(fisier, 'name', '') or '').lower()
+
+    try:
+        fisier.seek(0)
+    except Exception:
+        pass
+
+    if nume.endswith('.pdf'):
+        pdf_bytes = fisier.read()
+        if not pdf_bytes:
+            raise ValueError('Fișierul PDF este gol.')
+
+        try:
+            with fitz.open(stream=pdf_bytes, filetype='pdf') as doc:
+                if doc.page_count == 0:
+                    raise ValueError('PDF-ul nu conține pagini valide.')
+                pagina = doc[0]
+                mat = fitz.Matrix(2, 2)
+                pix = pagina.get_pixmap(matrix=mat)
+                img_bytes = pix.tobytes('png')
+            imagine = PIL.Image.open(io.BytesIO(img_bytes))
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise ValueError('Fișierul PDF nu poate fi procesat.') from exc
+    else:
+        try:
+            imagine = PIL.Image.open(fisier)
+        except UnidentifiedImageError as exc:
+            raise ValueError('Fișierul încărcat nu este o imagine validă.') from exc
+
+    imagine = ImageOps.exif_transpose(imagine)
+    if imagine.mode not in ['RGB', 'L']:
+        imagine = imagine.convert('RGB')
+    imagine.load()
+
+    return imagine
+
+
 def pregateste_bon_upload(uploaded_file):
     extensie = Path(uploaded_file.name).suffix.lower()
-    if extensie not in ['.jpg', '.jpeg', '.png', '.pdf']:
-        raise ValueError('Sunt acceptate doar fișiere JPG, PNG sau PDF.')
+    if extensie not in ['.jpg', '.jpeg', '.png', '.webp', '.pdf']:
+        raise ValueError('Fișierul trebuie să fie PNG, JPG, WebP sau PDF')
+
+    content_type = (uploaded_file.content_type or '').lower()
+    if content_type and content_type not in FORMATE_ACCEPTATE:
+        raise ValueError('Fișierul trebuie să fie PNG, JPG, WebP sau PDF')
 
     file_bytes = uploaded_file.read()
+    if not file_bytes:
+        raise ValueError('Fișierul încărcat este gol.')
+
+    fisier_pentru_procesare = BytesIO(file_bytes)
+    fisier_pentru_procesare.name = uploaded_file.name
+    proceseaza_imagine_bon(fisier_pentru_procesare)
+
     identificator = uuid.uuid4().hex
     fisier_original_relativ = f'bonuri/{identificator}{extensie or ".bin"}'
     fisier_original_salvat = default_storage.save(fisier_original_relativ, ContentFile(file_bytes))
     original_url = default_storage.url(fisier_original_salvat)
     original_path = default_storage.path(fisier_original_salvat)
 
-    preview_url = original_url
-    imagine_path = original_path
-
-    if extensie == '.pdf':
-        try:
-            reader = PdfReader(BytesIO(file_bytes))
-        except Exception as exc:
-            raise ValueError('Fișierul PDF nu poate fi citit.') from exc
-
-        if not reader.pages:
-            raise ValueError('PDF-ul nu conține pagini valide.')
-
-        prima_pagina = reader.pages[0]
-        imagini = list(prima_pagina.images)
-        if not imagini:
-            raise ValueError('PDF-ul nu conține o imagine pe prima pagină. Încarcă un PDF scanat sau JPG/PNG.')
-
-        imagine_pdf = imagini[0]
-        try:
-            imagine = PIL.Image.open(BytesIO(imagine_pdf.data))
-            imagine = ImageOps.exif_transpose(imagine)
-            if imagine.mode not in ['RGB', 'L']:
-                imagine = imagine.convert('RGB')
-        except UnidentifiedImageError as exc:
-            raise ValueError('Imaginea extrasă din PDF nu este validă.') from exc
-
-        preview_buffer = BytesIO()
-        imagine.save(preview_buffer, format='PNG')
-        preview_relativ = f'bonuri/{identificator}_preview.png'
-        preview_salvat = default_storage.save(preview_relativ, ContentFile(preview_buffer.getvalue()))
-        preview_url = default_storage.url(preview_salvat)
-        imagine_path = default_storage.path(preview_salvat)
-    else:
-        try:
-            imagine = PIL.Image.open(BytesIO(file_bytes))
-            imagine = ImageOps.exif_transpose(imagine)
-            if imagine.mode not in ['RGB', 'L']:
-                imagine = imagine.convert('RGB')
-        except UnidentifiedImageError as exc:
-            raise ValueError('Fișierul încărcat nu este o imagine validă.') from exc
-
     return {
         'original_url': original_url,
-        'preview_url': preview_url,
+        'preview_url': original_url,
         'stored_path': fisier_original_salvat,
-        'imagine_path': imagine_path,
+        'imagine_path': original_path,
         'filename': uploaded_file.name,
+        'is_pdf': extensie == '.pdf',
     }
+
+
 def analizeaza_bon_cu_gemini(imagine_path):
     prompt = (
         "Analizează acest bon de cumpărături și extrage:\n"
@@ -721,7 +876,8 @@ def analizeaza_bon_cu_gemini(imagine_path):
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-flash-lite-latest')
-    imagine = PIL.Image.open(imagine_path)
+    with open(imagine_path, 'rb') as fisier:
+        imagine = proceseaza_imagine_bon(fisier)
     response = model.generate_content([prompt, imagine])
     response_text = (response.text or '').strip()
     return curata_json_text(response_text), response_text
@@ -743,6 +899,7 @@ def sterge_date_bon_din_sesiune(request):
 
 
 @login_required
+@check_limit('scanare')
 def scaneaza_bon(request):
     categorii = Categorie.objects.all().order_by('nume')
     bon_scan_data = obtine_date_bon_din_sesiune(request)
@@ -753,7 +910,7 @@ def scaneaza_bon(request):
         if actiune == 'analizeaza':
             fisier = request.FILES.get('bon_fisier')
             if not fisier:
-                messages.error(request, 'Alege un fișier JPG, PNG sau PDF înainte de analiză.')
+                messages.error(request, 'Alege un fișier PNG, JPG, WebP sau PDF înainte de analiză.')
                 return redirect('scaneaza_bon')
 
             try:
@@ -774,6 +931,8 @@ def scaneaza_bon(request):
                     'file_url': pregatit['preview_url'],
                     'original_url': pregatit['original_url'],
                     'stored_path': pregatit['stored_path'],
+                    'filename': pregatit['filename'],
+                    'is_pdf': pregatit['is_pdf'],
                     'magazin': magazin,
                     'data_cumpararii': data_cumpararii,
                     'produse': produse,
@@ -785,6 +944,7 @@ def scaneaza_bon(request):
                     'raw_response': text_brut,
                 }
                 salveaza_date_bon_in_sesiune(request, scan_data)
+                ScanareLog.objects.create(utilizator=request.user)
                 messages.success(request, 'Bonul a fost analizat cu succes.')
                 return redirect('scaneaza_bon')
             except Exception as exc:
@@ -886,7 +1046,7 @@ def genereaza_analiza_ai(request, luna, an, force=False):
     )
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    analysis_text = genereaza_text_gemini(prompt)
+    analysis_text = curata_markdown(genereaza_text_gemini(prompt))
 
     if existing:
         existing.continut_analiza = analysis_text
@@ -905,8 +1065,11 @@ def genereaza_analiza_ai(request, luna, an, force=False):
 @login_required
 def dashboard(request):
     azi = timezone.now()
+    azi_data = timezone.localdate()
     luna_curenta = azi.month
     an_curent = azi.year
+
+    auto_adauga_subscriptions_lunare(request.user, azi=azi_data)
 
     total_luna = Cheltuiala.objects.filter(
         utilizator=request.user,
@@ -930,6 +1093,12 @@ def dashboard(request):
 
     bugete_dashboard = [construieste_buget_dashboard(buget, request.user) for buget in bugete_curente]
     bugete_depasite = [buget for buget in bugete_dashboard if buget['excedat']]
+
+    subscriptions_active = Subscription.objects.filter(utilizator=request.user, activ=True).select_related('categorie')
+    total_subscriptions_lunar = sum(
+        (suma_lunara_subscription(item) for item in subscriptions_active),
+        Decimal('0'),
+    )
 
     categorii_data = Cheltuiala.objects.filter(
         utilizator=request.user,
@@ -995,6 +1164,8 @@ def dashboard(request):
         'goals_top': goals_top,
         'total_economisit_goals': rotunjeste_bani(total_economisit_goals),
         'goals_active_count': goals_active.count(),
+        'subscriptions_active_count': subscriptions_active.count(),
+        'subscriptions_total_lunar': rotunjeste_bani(total_subscriptions_lunar),
     }
     return render(request, 'spndix/dashboard.html', context)
 
@@ -1010,6 +1181,126 @@ def marca_citita(request, pk):
     if next_url:
         return redirect(next_url)
     return redirect('dashboard')
+
+
+@login_required
+def upgrade(request):
+    plan_curent = obtine_user_plan(request.user)
+    return render(
+        request,
+        'spndix/upgrade.html',
+        {
+            'plan_curent': plan_curent,
+        },
+    )
+
+
+@login_required
+def checkout(request, plan):
+    plan = (plan or '').lower()
+    if plan == 'pro':
+        suma = 1000
+        nume_plan = 'Spndix Pro'
+    elif plan == 'family':
+        suma = 2000
+        nume_plan = 'Spndix Family'
+    else:
+        messages.error(request, 'Plan invalid selectat.')
+        return redirect('upgrade')
+
+    if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_PUBLIC_KEY:
+        messages.error(request, 'Stripe nu este configurat complet. Verifică variabilele din .env.')
+        return redirect('upgrade')
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    checkout_kwargs = {
+        'payment_method_types': ['card'],
+        'line_items': [{
+            'price_data': {
+                'currency': 'ron',
+                'product_data': {
+                    'name': nume_plan,
+                },
+                'unit_amount': suma,
+                'recurring': {
+                    'interval': 'month',
+                },
+            },
+            'quantity': 1,
+        }],
+        'mode': 'subscription',
+        'success_url': request.build_absolute_uri('/upgrade/success/?session_id={CHECKOUT_SESSION_ID}'),
+        'cancel_url': request.build_absolute_uri('/upgrade/'),
+        'metadata': {
+            'user_id': str(request.user.id),
+            'plan': plan,
+        },
+    }
+
+    if request.user.email:
+        checkout_kwargs['customer_email'] = request.user.email
+
+    try:
+        session = stripe.checkout.Session.create(**checkout_kwargs)
+    except Exception as exc:
+        messages.error(request, f'Nu s-a putut crea sesiunea Stripe: {exc}')
+        return redirect('upgrade')
+
+    return redirect(session.url)
+
+
+@login_required
+def upgrade_success(request):
+    session_id = request.GET.get('session_id')
+    if not session_id:
+        messages.error(request, 'Lipsește sesiunea Stripe pentru confirmarea plății.')
+        return redirect('upgrade')
+
+    if not settings.STRIPE_SECRET_KEY:
+        messages.error(request, 'Stripe nu este configurat complet. Verifică variabilele din .env.')
+        return redirect('upgrade')
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception as exc:
+        messages.error(request, f'Nu s-a putut valida sesiunea Stripe: {exc}')
+        return redirect('upgrade')
+
+    if session.get('status') != 'complete':
+        messages.warning(request, 'Plata nu este încă finalizată.')
+        return redirect('upgrade')
+
+    plan_selectat = (session.get('metadata', {}) or {}).get('plan', 'pro').lower()
+    if plan_selectat not in ['pro', 'family']:
+        plan_selectat = 'pro'
+
+    user_plan = obtine_user_plan(request.user)
+    user_plan.plan = plan_selectat
+    user_plan.activ = True
+    user_plan.data_expirare = timezone.localdate() + timedelta(days=30)
+    user_plan.stripe_customer_id = session.get('customer') or user_plan.stripe_customer_id
+    subscription_id = session.get('subscription')
+    if isinstance(subscription_id, str):
+        user_plan.stripe_subscription_id = subscription_id
+    user_plan.save(
+        update_fields=[
+            'plan',
+            'activ',
+            'data_expirare',
+            'stripe_customer_id',
+            'stripe_subscription_id',
+        ]
+    )
+
+    return render(
+        request,
+        'spndix/upgrade_success.html',
+        {
+            'plan_selectat': plan_selectat,
+        },
+    )
 
 
 @login_required
@@ -1116,6 +1407,139 @@ def adauga_contributie(request, pk):
     }
     return render(request, 'spndix/goals/adauga_contributie.html', context)
 
+
+def construieste_subscription_card(subscription):
+    return {
+        'subscription': subscription,
+        'suma_lunara': suma_lunara_subscription(subscription),
+        'urmatoarea_plata': subscription.urmatoarea_plata,
+    }
+
+
+@login_required
+def lista_subscriptions(request):
+    azi = timezone.localdate()
+    sincronizeaza_urmatoare_plati_subscriptions(request.user, referinta=azi)
+
+    if request.method == 'POST':
+        form = SubscriptionForm(request.POST)
+        if form.is_valid():
+            subscription = form.save(commit=False)
+            subscription.utilizator = request.user
+            subscription.frecventa = 'lunar'
+            subscription.activ = True
+            subscription.detectat_automat = False
+            if not subscription.ziua_lunii:
+                subscription.ziua_lunii = 1
+            subscription.urmatoarea_plata = urmatoarea_data_subscription(subscription, referinta=azi)
+            subscription.save()
+            messages.success(request, f"Abonamentul '{subscription.nume}' a fost adăugat.")
+            return redirect('lista_subscriptions')
+    else:
+        form = SubscriptionForm(initial={'ziua_lunii': 1})
+
+    subscriptions = list(
+        Subscription.objects.filter(utilizator=request.user)
+        .select_related('categorie')
+        .order_by('-activ', 'urmatoarea_plata', 'nume')
+    )
+    subscriptions_active = [item for item in subscriptions if item.activ]
+    subscriptions_inactive = [item for item in subscriptions if not item.activ]
+    total_lunar = sum((suma_lunara_subscription(item) for item in subscriptions_active), Decimal('0'))
+
+    venit_lunar = None
+    try:
+        profil = request.user.userprofile
+        if profil.venit_lunar:
+            venit_lunar = Decimal(profil.venit_lunar)
+    except UserProfile.DoesNotExist:
+        venit_lunar = None
+
+    prag_20_venit = None
+    depaseste_prag_venit = False
+    if venit_lunar and venit_lunar > 0:
+        prag_20_venit = rotunjeste_bani(venit_lunar * Decimal('0.20'))
+        depaseste_prag_venit = total_lunar > prag_20_venit
+
+    context = {
+        'form': form,
+        'active_subscription_cards': [construieste_subscription_card(item) for item in subscriptions_active],
+        'inactive_subscription_cards': [construieste_subscription_card(item) for item in subscriptions_inactive],
+        'subscriptions_active_count': len(subscriptions_active),
+        'subscriptions_total_lunar': rotunjeste_bani(total_lunar),
+        'venit_lunar': rotunjeste_bani(venit_lunar) if venit_lunar else None,
+        'prag_20_venit': prag_20_venit,
+        'depaseste_prag_venit': depaseste_prag_venit,
+    }
+    return render(request, 'spndix/subscriptions/lista.html', context)
+
+
+@login_required
+def editeaza_subscription(request, pk):
+    subscription = get_object_or_404(Subscription, pk=pk, utilizator=request.user)
+
+    if request.method == 'POST':
+        form = SubscriptionForm(request.POST, instance=subscription)
+        if form.is_valid():
+            subscription = form.save(commit=False)
+            subscription.frecventa = 'lunar'
+            if not subscription.ziua_lunii:
+                subscription.ziua_lunii = 1
+            if subscription.activ:
+                subscription.urmatoarea_plata = urmatoarea_data_subscription(subscription, referinta=timezone.localdate())
+            subscription.save()
+            messages.success(request, f"Abonamentul '{subscription.nume}' a fost actualizat.")
+            return redirect('lista_subscriptions')
+    else:
+        form = SubscriptionForm(instance=subscription)
+
+    context = {
+        'form': form,
+        'titlu': 'Editează abonament',
+        'cancel_url': 'lista_subscriptions',
+    }
+    return render(request, 'spndix/form.html', context)
+
+
+@login_required
+def anuleaza_subscription(request, pk):
+    subscription = get_object_or_404(Subscription, pk=pk, utilizator=request.user)
+
+    if request.method == 'POST' and subscription.activ:
+        subscription.activ = False
+        subscription.urmatoarea_plata = None
+        subscription.save(update_fields=['activ', 'urmatoarea_plata'])
+        messages.success(request, f"Monitorizarea abonamentului '{subscription.nume}' a fost anulată.")
+
+    return redirect('lista_subscriptions')
+
+
+@login_required
+def activeaza_subscription(request, pk):
+    subscription = get_object_or_404(Subscription, pk=pk, utilizator=request.user)
+
+    if request.method == 'POST' and not subscription.activ:
+        subscription.activ = True
+        if not subscription.ziua_lunii:
+            subscription.ziua_lunii = 1
+        subscription.urmatoarea_plata = urmatoarea_data_subscription(subscription, referinta=timezone.localdate())
+        subscription.save(update_fields=['activ', 'ziua_lunii', 'urmatoarea_plata'])
+        messages.success(request, f"Monitorizarea abonamentului '{subscription.nume}' a fost reactivată.")
+
+    return redirect('lista_subscriptions')
+
+
+@login_required
+def sterge_subscription(request, pk):
+    subscription = get_object_or_404(Subscription, pk=pk, utilizator=request.user)
+
+    if request.method == 'POST':
+        nume = subscription.nume
+        subscription.delete()
+        messages.success(request, f"Abonamentul '{nume}' a fost șters.")
+
+    return redirect('lista_subscriptions')
+
 @login_required
 def lista_cheltuieli(request):
     cheltuieli = Cheltuiala.objects.filter(utilizator=request.user).select_related('categorie').order_by('-data', '-id')
@@ -1154,6 +1578,7 @@ def lista_cheltuieli(request):
 
 
 @login_required
+@check_limit('analiza')
 def analiza_ai(request):
     luna_selectata, an_selectat = obtine_filtre_luna_an(request)
     cheltuieli_count = Cheltuiala.objects.filter(
@@ -1221,6 +1646,7 @@ def analiza_ai(request):
 
 
 @login_required
+@check_limit('export')
 def export_cheltuieli_excel(request):
     cheltuieli, luna, an = cheltuieli_din_filtre(request)
 
@@ -1281,10 +1707,12 @@ def export_cheltuieli_excel(request):
     output = BytesIO()
     wb.save(output)
     response.write(output.getvalue())
+    ExportLog.objects.create(utilizator=request.user, tip='excel')
     return response
 
 
 @login_required
+@check_limit('export')
 def export_cheltuieli_pdf(request):
     cheltuieli, luna, an = cheltuieli_din_filtre(request)
 
@@ -1351,6 +1779,7 @@ def export_cheltuieli_pdf(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{nume_fisier_export(luna, an, "pdf")}"'
     response.write(pdf)
+    ExportLog.objects.create(utilizator=request.user, tip='pdf')
     return response
 
 @login_required

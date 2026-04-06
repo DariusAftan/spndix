@@ -16,7 +16,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
         <h2 class="mb-1"><i class="bi bi-upc-scan me-2"></i>Scanează bon</h2>
-        <p class="text-body-secondary mb-0">Încarcă un bon JPG, PNG sau PDF și extrage automat cheltuiala.</p>
+        <p class="text-body-secondary mb-0">Încarcă un bon JPG, PNG, WebP sau PDF și extrage automat cheltuiala.</p>
     </div>
 </div>
 
@@ -27,7 +27,7 @@
             <input type="hidden" name="action" value="analizeaza">
             <div class="col-md-8">
                 <label class="form-label fw-semibold">Fișier bon</label>
-                <input type="file" name="bon_fisier" class="form-control" accept=".jpg,.jpeg,.png,.pdf" required>
+                <input type="file" name="bon_fisier" class="form-control" accept=".png,.jpg,.jpeg,.webp,.pdf" required>
             </div>
             <div class="col-md-4 d-grid">
                 <button type="submit" class="btn btn-primary">
@@ -46,7 +46,15 @@
                     <i class="bi bi-image me-1"></i> Preview bon
                 </div>
                 <div class="card-body text-center">
-                    <img src="{{ bon_scan.file_url }}" alt="Preview bon" class="img-fluid rounded border">
+                    {% if bon_scan.is_pdf %}
+                        <div class="d-flex flex-column align-items-center justify-content-center py-4">
+                            <i class="bi bi-file-earmark-pdf-fill text-danger" style="font-size: 4rem;"></i>
+                            <p class="fw-semibold mt-3 mb-1">{{ bon_scan.filename|default:"Fișier PDF" }}</p>
+                            <p class="text-body-secondary small mb-0">Fișier PDF detectat. Pentru analiză este folosită prima pagină.</p>
+                        </div>
+                    {% else %}
+                        <img src="{{ bon_scan.file_url }}" alt="Preview bon" class="img-fluid rounded border">
+                    {% endif %}
                     <p class="text-body-secondary small mt-3 mb-0">{{ bon_scan.original_url }}</p>
                 </div>
             </div>
@@ -186,7 +194,7 @@
             <div class="alert alert-info shadow-sm mb-0">
                 <div class="fw-semibold mb-2"><i class="bi bi-info-circle"></i> Observații</div>
                 <p class="mb-2">• Bonul este salvat în <code>media/bonuri/</code>.</p>
-                <p class="mb-2">• Pentru PDF, se folosește prima pagină pentru recunoaștere.</p>
+                <p class="mb-2">• Sunt acceptate PNG, JPG, WebP și PDF.</p>
                 <p class="mb-0">• Poți modifica titlul și categoria înainte de salvare.</p>
             </div>
         </div>
