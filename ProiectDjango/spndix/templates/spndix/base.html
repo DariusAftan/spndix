@@ -357,20 +357,33 @@
             color: var(--text-secondary);
         }
 
-        .plan-chip.pro,
-        .plan-chip.family {
+        .plan-chip.free {
+            background: #e5e7eb;
+            border-color: #d1d5db;
+            color: #374151;
+        }
+
+        .plan-chip.pro {
             color: #fff;
             border-color: transparent;
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            background: linear-gradient(135deg, #7c3aed, #5b21b6);
         }
 
         .plan-chip.family {
-            background: linear-gradient(135deg, #0f766e, #0e7490);
+            color: #5b3b00;
+            border-color: #fbbf24;
+            background: linear-gradient(135deg, #fde68a, #f59e0b);
+        }
+
+        [data-bs-theme="dark"] .plan-chip.free {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
         }
 
         .free-upgrade-banner {
-            border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
-            background: linear-gradient(90deg, color-mix(in srgb, var(--warning) 18%, transparent), transparent);
+            border: 1px solid rgba(124, 58, 237, 0.22);
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(59, 130, 246, 0.10));
             border-radius: 14px;
             margin-bottom: 16px;
         }
@@ -487,8 +500,10 @@
                 <ul class="nav center-nav desktop-nav flex-nowrap align-items-center justify-content-center gap-1 mx-auto">
                     <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-house-door"></i> Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_cheltuieli' %}"><i class="bi bi-receipt"></i> Cheltuieli</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'lista_smart_actions' %}"><i class="bi bi-lightning-charge"></i> Actions{% if smart_actions_pending_count > 0 %}<span class="badge bg-danger ms-1">{{ smart_actions_pending_count }}</span>{% endif %}</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_goals' %}"><i class="bi bi-trophy"></i> Goals</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_subscriptions' %}"><i class="bi bi-repeat"></i> Subscriptions</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'household' %}"><i class="bi bi-people"></i> Household</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'analiza_ai' %}"><i class="bi bi-robot"></i> AI</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_bugete' %}"><i class="bi bi-piggy-bank"></i> Bugete</a></li>
                 </ul>
@@ -509,11 +524,22 @@
                         <button class="btn btn-light d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <span class="avatar-chip">{{ user.username|slice:":1"|upper }}</span>
                             <span class="d-none d-xl-inline">{{ user.username }}</span>
-                            <span class="plan-chip {{ current_user_plan_name }} d-none d-md-inline">{{ current_user_plan_name|upper }}</span>
+                            <span class="plan-chip {{ current_user_plan_name }} d-none d-md-inline">
+                                {% if current_user_plan_name == 'pro' %}
+                                    Pro ⭐
+                                {% elif current_user_plan_name == 'family' %}
+                                    Family 👨‍👩‍👧
+                                {% else %}
+                                    Free
+                                {% endif %}
+                            </span>
                             <i class="bi bi-chevron-down small"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 p-2">
                             <li><a class="dropdown-item rounded-3" href="{% url 'profil' %}"><i class="bi bi-person-gear me-2"></i>Profil</a></li>
+                            <li><a class="dropdown-item rounded-3" href="{% url 'onboarding' %}"><i class="bi bi-signpost-2 me-2"></i>Onboarding</a></li>
+                            <li><a class="dropdown-item rounded-3" href="{% url 'lista_smart_actions' %}"><i class="bi bi-lightning-charge me-2"></i>Smart Actions{% if smart_actions_pending_count > 0 %} ({{ smart_actions_pending_count }}){% endif %}</a></li>
+                            <li><a class="dropdown-item rounded-3" href="{% url 'household' %}"><i class="bi bi-people me-2"></i>Household</a></li>
                             <li><a class="dropdown-item rounded-3" href="{% url 'scaneaza_bon' %}"><i class="bi bi-upc-scan me-2"></i>Scanează bon</a></li>
                             <li><a class="dropdown-item rounded-3" href="{% url 'adauga_cheltuiala' %}"><i class="bi bi-plus-circle me-2"></i>Adaugă cheltuială</a></li>
                             <li><a class="dropdown-item rounded-3" href="{% url 'lista_subscriptions' %}"><i class="bi bi-repeat me-2"></i>Subscriptions</a></li>
@@ -552,7 +578,15 @@
     <div class="offcanvas-body d-flex flex-column">
         <a class="btn btn-light text-start mb-2" href="{% url 'dashboard' %}"><i class="bi bi-house-door me-2"></i>Dashboard</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'lista_cheltuieli' %}"><i class="bi bi-receipt me-2"></i>Cheltuieli</a>
+        <a class="btn btn-light text-start mb-2 d-flex justify-content-between align-items-center" href="{% url 'lista_smart_actions' %}">
+            <span><i class="bi bi-lightning-charge me-2"></i>Smart Actions</span>
+            {% if smart_actions_pending_count > 0 %}
+                <span class="badge bg-danger">{{ smart_actions_pending_count }}</span>
+            {% endif %}
+        </a>
         <a class="btn btn-light text-start mb-2" href="{% url 'adauga_cheltuiala' %}"><i class="bi bi-plus-circle me-2"></i>Adaugă cheltuială</a>
+        <a class="btn btn-light text-start mb-2" href="{% url 'onboarding' %}"><i class="bi bi-signpost-2 me-2"></i>Onboarding</a>
+        <a class="btn btn-light text-start mb-2" href="{% url 'household' %}"><i class="bi bi-people me-2"></i>Household</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'lista_goals' %}"><i class="bi bi-trophy me-2"></i>Goals</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'lista_subscriptions' %}"><i class="bi bi-repeat me-2"></i>Subscriptions</a>
         <a class="btn btn-light text-start mb-2" href="{% url 'upgrade' %}"><i class="bi bi-stars me-2"></i>Upgrade</a>
@@ -584,10 +618,17 @@
         {% if user.is_authenticated and current_user_plan_name == 'free' %}
             <div class="free-upgrade-banner p-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
                 <div>
-                    <strong><i class="bi bi-gem me-1"></i>Plan Free activ</strong>
-                    <div class="small text-secondary">Treci la Pro pentru analize AI avansate, exporturi nelimitate și fără reclame.</div>
+                    <strong><i class="bi bi-stars me-1"></i>Planul Free este activ</strong>
+                    <div class="small text-secondary">Ai limite lunare pentru analiză, export și scanare. Fă upgrade la Pro pentru mai multă flexibilitate și fără banner promo.</div>
                 </div>
-                <a href="{% url 'upgrade' %}" class="btn btn-warning btn-sm"><i class="bi bi-arrow-up-right-circle me-1"></i>Upgrade Acum</a>
+                <a href="{% url 'upgrade' %}" class="btn btn-primary btn-sm"><i class="bi bi-arrow-up-right-circle me-1"></i>Upgrade la Pro</a>
+            </div>
+        {% endif %}
+
+        {% if user.is_authenticated and show_onboarding_hint %}
+            <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div><i class="bi bi-signpost-2 me-1"></i>Onboarding-ul tău este activ. Completează pașii din primele 7 zile pentru primul win financiar.</div>
+                <a href="{% url 'onboarding' %}" class="btn btn-sm btn-outline-primary">Continuă onboarding</a>
             </div>
         {% endif %}
 

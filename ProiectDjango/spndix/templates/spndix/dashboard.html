@@ -167,6 +167,106 @@
             </div>
         </div>
     </div>
+
+    {% if onboarding.afiseaza_card %}
+        <div class="col-12">
+            <div class="card shadow-sm fade-in">
+                <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <div class="small text-body-secondary">Onboarding 7 zile</div>
+                        <div class="fw-semibold fs-5">{{ onboarding.pasi_completati }} / {{ onboarding.total_pasi }} pași completați ({{ onboarding.progres_pct }}%)</div>
+                        <div class="small text-body-secondary">
+                            {% if onboarding.zile_ramase is not None %}
+                                Mai ai {{ onboarding.zile_ramase }} zile pentru primul win financiar.
+                            {% else %}
+                                Continuă onboarding-ul pentru recomandări mai bune.
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="{% url 'onboarding' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-signpost-2 me-1"></i>Continuă onboarding
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100 fade-in">
+            <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-lightning-charge me-2"></i>Smart Actions</span>
+                <a href="{% url 'lista_smart_actions' %}" class="btn btn-outline-dark btn-sm">Vezi toate</a>
+            </div>
+            <div class="card-body pt-0 px-3 pb-3">
+                {% if smart_actions_pending %}
+                    <div class="d-grid gap-2">
+                        {% for action in smart_actions_pending %}
+                            <div class="forecast-item p-2">
+                                <div class="fw-semibold">{{ action.titlu }}</div>
+                                <div class="small text-body-secondary">{{ action.descriere }}</div>
+                                <div class="small text-body-secondary mt-1">
+                                    Impact estimat: {{ action.impact_estimat|floatformat:2 }} RON
+                                    {% if action.data_scadenta %} · Scadență: {{ action.data_scadenta|date:'d.m.Y' }}{% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-body-secondary small">Nu ai smart actions în așteptare.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100 fade-in">
+            <div class="card-header bg-transparent border-0 pt-3 px-3 fw-semibold">
+                <i class="bi bi-graph-up-arrow me-2"></i>Receipt Intelligence
+            </div>
+            <div class="card-body pt-0 px-3 pb-3">
+                {% if receipt_intelligence %}
+                    <div class="small text-body-secondary mb-1">Magazin cu scor bun</div>
+                    <div class="fw-semibold mb-2">{{ receipt_intelligence.magazin_best }} · cost mediu/produs {{ receipt_intelligence.cost_mediu_best|floatformat:2 }} RON</div>
+                    <div class="small text-body-secondary mb-1">Inflație personală (ultimele 30 zile)</div>
+                    <div class="fw-semibold mb-2">
+                        {% if receipt_intelligence.inflatie_personala_pct is not None %}
+                            {{ receipt_intelligence.inflatie_personala_pct }}%
+                        {% else %}
+                            Date insuficiente
+                        {% endif %}
+                    </div>
+                    <div class="small text-body-secondary mb-1">Comparație coș lunar</div>
+                    <div class="fw-semibold">
+                        Curent: {{ receipt_intelligence.cos_mediu_curent|floatformat:2 }} RON
+                        · Precedent: {{ receipt_intelligence.cos_mediu_precedent|floatformat:2 }} RON
+                        {% if receipt_intelligence.variatie_cos_pct is not None %}
+                            · Variație: {{ receipt_intelligence.variatie_cos_pct }}%
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="text-body-secondary small">Scanează câteva bonuri ca să activăm indicatorii de receipt intelligence.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if household_summary %}
+        <div class="col-12">
+            <div class="card shadow-sm fade-in">
+                <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="small text-body-secondary">Household mode</div>
+                        <div class="fw-semibold fs-5">
+                            {{ household_summary.household.nume }} · {{ household_summary.membri_count }} membri · {{ household_summary.total_luna|floatformat:2 }} RON luna curentă
+                        </div>
+                    </div>
+                    <a href="{% url 'household' %}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-people me-1"></i>Gestionează household
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 </div>
 
 <div class="card mb-4 shadow-sm fade-in">
@@ -216,7 +316,7 @@
                         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                             <div>
                                 <div class="forecast-message">
-                                    {% if alerta.tip == 'depasire_iminenta' %}🔴{% elif alerta.tip == 'ritm_alert' %}🟡{% elif alerta.tip == 'economie_posibila' %}🟢{% elif alerta.tip == 'abonament_iminent' %}🟣{% else %}🔵{% endif %}
+                                    {% if alerta.tip == 'depasire_iminenta' %}🔴{% elif alerta.tip == 'ritm_alert' %}🟡{% elif alerta.tip == 'economie_posibila' %}🟢{% elif alerta.tip == 'abonament_iminent' %}🟣{% elif alerta.tip == 'abonament_scumpit' %}🟠{% elif alerta.tip == 'sugestie_anulare' %}⚫{% else %}🔵{% endif %}
                                     {{ alerta.mesaj }}
                                 </div>
                                 <div class="small text-body-secondary mt-1">{{ alerta.actiune_recomandata }}</div>
@@ -249,6 +349,10 @@
                                 {% elif alerta.tip == 'abonament_iminent' %}
                                     <a href="{% url 'lista_subscriptions' %}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-repeat me-1"></i>Vezi subscriptions
+                                    </a>
+                                {% elif alerta.tip == 'abonament_scumpit' or alerta.tip == 'sugestie_anulare' %}
+                                    <a href="{% url 'lista_subscriptions' %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-repeat me-1"></i>Revizuiește subscriptions
                                     </a>
                                 {% endif %}
 

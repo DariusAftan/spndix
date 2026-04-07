@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from .models import (
     Cheltuiala,
     Categorie,
@@ -13,6 +14,11 @@ from .models import (
     SavingsGoal,
     GoalContribution,
     Subscription,
+    Household,
+    HouseholdMember,
+    OnboardingJourney,
+    SmartAction,
+    ReceiptInsight,
     LUNA_CHOICES,
 )
 from .forms import (
@@ -23,16 +29,19 @@ from .forms import (
     SavingsGoalForm,
     GoalContributionForm,
     SubscriptionForm,
+    HouseholdCreateForm,
+    HouseholdAddMemberForm,
 )
 from .plan_limits import check_limit, obtine_user_plan
 from django.contrib import messages
 from django.contrib.auth import login
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.utils import timezone
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 import io
 import json
 import base64
@@ -239,6 +248,423 @@ def creeaza_alerta_daca_nu_exista(
     )
 
 
+def calculeaza_zile_pana_depasire(suma_limita, total_cheltuit, ritm_zilnic, zile_ramase_luna):
+    if ritm_zilnic <= 0:
+        return None
+
+    suma_ramasa = Decimal(suma_limita or 0) - Decimal(total_cheltuit or 0)
+    if suma_ramasa <= 0:
+        return 0
+
+    zile_float = float(suma_ramasa / ritm_zilnic)
+    zile_int = int(zile_float)
+    if zile_float > zile_int:
+        zile_int += 1
+
+    if zile_int > zile_ramase_luna:
+        return None
+
+    return max(zile_int, 0)
+
+
+def luna_an_in_urma(luna, an, luni):
+    luna_tinta = luna
+    an_tinta = an
+    pasi = max(int(luni or 0), 0)
+
+    for _ in range(pasi):
+        if luna_tinta == 1:
+            luna_tinta = 12
+            an_tinta -= 1
+        else:
+            luna_tinta -= 1
+
+    return luna_tinta, an_tinta
+
+
+KEYWORDS_SUBSCRIPTII_ESENTIALE = (
+    'chirie', 'rent', 'rata', 'mortgage', 'utilitati', 'utility',
+    'electricitate', 'electricity', 'gaz', 'gas', 'apa', 'water',
+    'internet', 'telefon', 'phone', 'asigurare', 'insurance',
+    'intretinere', 'condominiu', 'maintenance',
+)
+
+
+def subscription_este_esential(subscription):
+    nume = (subscription.nume or '').strip().lower()
+    categorie = ((subscription.categorie.nume if subscription.categorie else '') or '').strip().lower()
+    text = f"{nume} {categorie}".strip()
+    return any(keyword in text for keyword in KEYWORDS_SUBSCRIPTII_ESENTIALE)
+
+
+def curata_sugestii_anulare_pentru_esentiale(utilizator, subscriptions):
+    subscriptions_esentiale = [item for item in subscriptions if subscription_este_esential(item)]
+    if not subscriptions_esentiale:
+        return
+
+    expresie = Q()
+    for item in subscriptions_esentiale:
+        expresie |= Q(mesaj__icontains=item.nume)
+        if item.categorie and item.categorie.nume:
+            expresie |= Q(mesaj__icontains=item.categorie.nume)
+
+    if not expresie:
+        return
+
+    alerte_gresite = ForecastAlert.objects.filter(
+        utilizator=utilizator,
+        tip='sugestie_anulare',
+        citita=False,
+    ).filter(expresie)
+    alerta_ids = list(alerte_gresite.values_list('id', flat=True))
+    if not alerta_ids:
+        return
+
+    alerte_gresite.update(citita=True)
+    SmartAction.objects.filter(
+        utilizator=utilizator,
+        alerta_id__in=alerta_ids,
+        status='pending',
+    ).update(status='dismissed')
+
+
+def evalueaza_subscription_radar_avansat(utilizator, azi=None):
+    azi = azi or timezone.localdate()
+    subscriptions = list(
+        Subscription.objects.filter(utilizator=utilizator, activ=True)
+        .select_related('categorie')
+        .order_by('-suma_estimata')
+    )
+    if not subscriptions:
+        return
+
+    curata_sugestii_anulare_pentru_esentiale(utilizator, subscriptions)
+
+    for subscription in subscriptions:
+        este_esential = subscription_este_esential(subscription)
+        zile_pana_plata = None
+        if subscription.urmatoarea_plata:
+            zile_pana_plata = (subscription.urmatoarea_plata - azi).days
+
+        if zile_pana_plata is not None and 0 <= zile_pana_plata <= 3:
+            if este_esential:
+                mesaj = (
+                    f"Cheltuiala recurentă esențială {subscription.nume} este scadentă în {zile_pana_plata} "
+                    f"zile (~{rotunjeste_bani(subscription.suma_estimata)} RON)."
+                )
+                actiune = (
+                    f"Asigură fondurile pentru {subscription.nume} și, dacă poți, optimizează costul prin "
+                    "renegociere sau verificarea ofertelor alternative."
+                )
+            else:
+                mesaj = (
+                    f"Abonamentul {subscription.nume} urmează să fie debitat în {zile_pana_plata} "
+                    f"zile, cu aproximativ {rotunjeste_bani(subscription.suma_estimata)} RON."
+                )
+                actiune = (
+                    f"Verifică dacă folosești {subscription.nume} și decide dacă păstrezi sau schimbi planul "
+                    "înainte de următoarea debitare."
+                )
+            creeaza_alerta_daca_nu_exista(
+                utilizator=utilizator,
+                categorie=subscription.categorie,
+                tip='abonament_iminent',
+                mesaj=mesaj,
+                suma_implicata=subscription.suma_estimata,
+                zile_ramase=zile_pana_plata,
+                actiune_recomandata=actiune,
+            )
+
+        cheltuiala_luna_curenta = Cheltuiala.objects.filter(
+            utilizator=utilizator,
+            titlu__iexact=subscription.nume,
+            data__month=azi.month,
+            data__year=azi.year,
+        ).aggregate(total=Sum('suma'))['total'] or Decimal('0')
+
+        totaluri_luni_anterioare = []
+        for luni_anterioare in range(1, 4):
+            luna_tinta, an_tinta = luna_an_in_urma(azi.month, azi.year, luni_anterioare)
+            total_luna = Cheltuiala.objects.filter(
+                utilizator=utilizator,
+                titlu__iexact=subscription.nume,
+                data__month=luna_tinta,
+                data__year=an_tinta,
+            ).aggregate(total=Sum('suma'))['total'] or Decimal('0')
+            if total_luna > 0:
+                totaluri_luni_anterioare.append(Decimal(total_luna))
+
+        if totaluri_luni_anterioare and cheltuiala_luna_curenta > 0:
+            medie_anterioara = sum(totaluri_luni_anterioare, Decimal('0')) / Decimal(len(totaluri_luni_anterioare))
+            prag_scumpire = medie_anterioara * Decimal('1.15')
+            if cheltuiala_luna_curenta >= prag_scumpire and medie_anterioara > 0:
+                diferenta = rotunjeste_bani(cheltuiala_luna_curenta - medie_anterioara)
+                crestere_pct = ((cheltuiala_luna_curenta - medie_anterioara) / medie_anterioara) * Decimal('100')
+                crestere_text = crestere_pct.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)
+                mesaj = (
+                    f"Abonamentul {subscription.nume} pare mai scump luna aceasta: "
+                    f"{rotunjeste_bani(cheltuiala_luna_curenta)} RON vs media recentă "
+                    f"{rotunjeste_bani(medie_anterioara)} RON (+{crestere_text}%)."
+                )
+                if este_esential:
+                    actiune = (
+                        f"{subscription.nume} este o cheltuială esențială: prioritar renegociază contractul "
+                        f"sau optimizează consumul. Poți recupera aproximativ {diferenta} RON/lună."
+                    )
+                else:
+                    actiune = (
+                        f"Verifică planul {subscription.nume}, caută opțiuni mai ieftine sau negociază prețul. "
+                        f"Poți recupera aproximativ {diferenta} RON/lună."
+                    )
+                creeaza_alerta_daca_nu_exista(
+                    utilizator=utilizator,
+                    categorie=subscription.categorie,
+                    tip='abonament_scumpit',
+                    mesaj=mesaj,
+                    suma_implicata=diferenta,
+                    zile_ramase=zile_pana_plata,
+                    actiune_recomandata=actiune,
+                )
+
+    try:
+        profil = utilizator.userprofile
+        venit_lunar = Decimal(profil.venit_lunar or 0)
+    except UserProfile.DoesNotExist:
+        venit_lunar = Decimal('0')
+
+    total_subscriptions = sum((suma_lunara_subscription(item) for item in subscriptions), Decimal('0'))
+    if venit_lunar > 0 and subscriptions and total_subscriptions >= venit_lunar * Decimal('0.25'):
+        subscriptions_optionale = [item for item in subscriptions if not subscription_este_esential(item)]
+        subscription_scump = subscriptions_optionale[0] if subscriptions_optionale else None
+
+        if subscription_scump is None:
+            mesaj = (
+                f"Cheltuielile recurente active consumă {rotunjeste_bani(total_subscriptions)} RON/lună (peste 25% din venit), "
+                "dar majoritatea sunt esențiale."
+            )
+            actiune = (
+                "Nu anula cheltuielile esențiale (ex. chirie/utilități). Concentrează-te pe renegociere și pe reducerea "
+                "abonamentelor opționale, dacă apar."
+            )
+            creeaza_alerta_daca_nu_exista(
+                utilizator=utilizator,
+                categorie=None,
+                tip='ritm_alert',
+                mesaj=mesaj,
+                suma_implicata=total_subscriptions,
+                zile_ramase=7,
+                actiune_recomandata=actiune,
+            )
+            return
+
+        zile_pana_plata = None
+        if subscription_scump.urmatoarea_plata:
+            zile_pana_plata = (subscription_scump.urmatoarea_plata - azi).days
+        mesaj = (
+            f"Abonamentele active consumă {rotunjeste_bani(total_subscriptions)} RON/lună, peste 25% din venitul tău. "
+            f"Cel mai scump este {subscription_scump.nume} ({rotunjeste_bani(subscription_scump.suma_estimata)} RON)."
+        )
+        actiune = (
+            f"Dacă anulezi sau reduci planul pentru {subscription_scump.nume}, poți elibera rapid "
+            f"{rotunjeste_bani(subscription_scump.suma_estimata)} RON/lună."
+        )
+        creeaza_alerta_daca_nu_exista(
+            utilizator=utilizator,
+            categorie=subscription_scump.categorie,
+            tip='sugestie_anulare',
+            mesaj=mesaj,
+            suma_implicata=subscription_scump.suma_estimata,
+            zile_ramase=zile_pana_plata,
+            actiune_recomandata=actiune,
+        )
+
+
+def sincronizeaza_smart_actions_din_alerte(utilizator):
+    azi = timezone.localdate()
+
+    alerte_active = ForecastAlert.objects.filter(
+        utilizator=utilizator,
+        citita=False,
+    ).select_related('categorie').order_by('-creat_la')[:30]
+
+    for alerta in alerte_active:
+        if alerta.tip in ['depasire_iminenta', 'ritm_alert']:
+            categorie_text = alerta.categorie.nume if alerta.categorie else 'categoria relevantă'
+            titlu = f"Optimizează bugetul pentru {categorie_text}"
+            tip_action = 'buget'
+        elif alerta.tip == 'abonament_iminent':
+            categorie_text = alerta.categorie.nume if alerta.categorie else 'abonamente'
+            titlu = f"Pregătește plata recurentă ({categorie_text})"
+            tip_action = 'abonament'
+        elif alerta.tip == 'abonament_scumpit':
+            titlu = 'Verifică scumpirea unui abonament'
+            tip_action = 'abonament'
+        elif alerta.tip == 'sugestie_anulare':
+            titlu = 'Evaluează reducerea abonamentelor opționale'
+            tip_action = 'abonament'
+        elif alerta.tip == 'recurenta_detectata':
+            titlu = 'Confirmă o cheltuială recurentă detectată'
+            tip_action = 'abonament'
+        else:
+            titlu = 'Aplică o optimizare financiară recomandată'
+            tip_action = 'economii'
+
+        data_scadenta = None
+        if alerta.zile_ramase is not None:
+            data_scadenta = azi + timedelta(days=max(1, min(int(alerta.zile_ramase), 14)))
+        else:
+            data_scadenta = azi + timedelta(days=3)
+
+        defaults = {
+            'utilizator': utilizator,
+            'titlu': titlu,
+            'descriere': alerta.actiune_recomandata,
+            'tip': tip_action,
+            'status': 'pending',
+            'impact_estimat': rotunjeste_bani(alerta.suma_implicata),
+            'data_scadenta': data_scadenta,
+        }
+
+        action, created = SmartAction.objects.get_or_create(
+            alerta=alerta,
+            defaults=defaults,
+        )
+        if not created and action.status == 'pending':
+            action.titlu = titlu
+            action.descriere = alerta.actiune_recomandata
+            action.tip = tip_action
+            action.impact_estimat = rotunjeste_bani(alerta.suma_implicata)
+            action.data_scadenta = data_scadenta
+            action.save(update_fields=['titlu', 'descriere', 'tip', 'impact_estimat', 'data_scadenta'])
+
+    SmartAction.objects.filter(
+        utilizator=utilizator,
+        alerta__citita=True,
+        status='pending',
+    ).update(status='dismissed')
+
+    return list(
+        SmartAction.objects.filter(utilizator=utilizator)
+        .select_related('alerta')
+        .order_by('status', 'data_scadenta', '-creat_la')[:12]
+    )
+
+
+def media_decimala(valori):
+    valori_filtrate = [Decimal(val) for val in valori if Decimal(val) > 0]
+    if not valori_filtrate:
+        return Decimal('0')
+    return sum(valori_filtrate, Decimal('0')) / Decimal(len(valori_filtrate))
+
+
+def calculeaza_receipt_intelligence(utilizator, azi=None):
+    azi = azi or timezone.localdate()
+    start = azi - timedelta(days=120)
+    bonuri = list(
+        ReceiptInsight.objects.filter(utilizator=utilizator, data_bon__gte=start)
+        .order_by('-data_bon', '-creat_la')
+    )
+    if not bonuri:
+        return None
+
+    costuri_pe_magazin = {}
+    for bon in bonuri:
+        cheia = (bon.magazin or 'Necunoscut').strip() or 'Necunoscut'
+        cost_unitar = Decimal(bon.pret_mediu_produs or 0)
+        if cost_unitar <= 0:
+            produse = max(int(bon.nr_produse or 0), 1)
+            cost_unitar = Decimal(bon.total or 0) / Decimal(produse)
+        costuri_pe_magazin.setdefault(cheia, []).append(cost_unitar)
+
+    magazine_medii = {
+        magazin: media_decimala(valori)
+        for magazin, valori in costuri_pe_magazin.items()
+        if valori
+    }
+    magazin_best = min(magazine_medii, key=magazine_medii.get)
+    media_best = magazine_medii[magazin_best]
+    media_globala = media_decimala(list(magazine_medii.values()))
+
+    economisire_pct = Decimal('0')
+    if media_globala > 0:
+        economisire_pct = ((media_globala - media_best) / media_globala) * Decimal('100')
+
+    perioada_curenta_start = azi - timedelta(days=30)
+    perioada_anterioara_start = azi - timedelta(days=60)
+    perioada_anterioara_end = azi - timedelta(days=31)
+
+    preturi_curente = [
+        Decimal(item.pret_mediu_produs or 0)
+        for item in bonuri
+        if item.data_bon >= perioada_curenta_start and Decimal(item.pret_mediu_produs or 0) > 0
+    ]
+    preturi_anterioare = [
+        Decimal(item.pret_mediu_produs or 0)
+        for item in bonuri
+        if perioada_anterioara_start <= item.data_bon <= perioada_anterioara_end and Decimal(item.pret_mediu_produs or 0) > 0
+    ]
+    medie_curenta = media_decimala(preturi_curente)
+    medie_anterioara = media_decimala(preturi_anterioare)
+
+    inflatie_personala_pct = None
+    if medie_anterioara > 0 and medie_curenta > 0:
+        inflatie_personala_pct = ((medie_curenta - medie_anterioara) / medie_anterioara) * Decimal('100')
+
+    luna_precedenta, an_precedent = obtine_luna_precedenta(azi.month, azi.year)
+    cos_curent = media_decimala([
+        Decimal(item.total or 0)
+        for item in bonuri
+        if item.data_bon.month == azi.month and item.data_bon.year == azi.year
+    ])
+    cos_precedent = media_decimala([
+        Decimal(item.total or 0)
+        for item in bonuri
+        if item.data_bon.month == luna_precedenta and item.data_bon.year == an_precedent
+    ])
+
+    variatie_cos_pct = None
+    if cos_precedent > 0 and cos_curent > 0:
+        variatie_cos_pct = ((cos_curent - cos_precedent) / cos_precedent) * Decimal('100')
+
+    return {
+        'bonuri_count': len(bonuri),
+        'magazin_best': magazin_best,
+        'cost_mediu_best': rotunjeste_bani(media_best),
+        'economisire_pct': economisire_pct.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
+        'inflatie_personala_pct': None if inflatie_personala_pct is None else inflatie_personala_pct.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
+        'cos_mediu_curent': rotunjeste_bani(cos_curent),
+        'cos_mediu_precedent': rotunjeste_bani(cos_precedent),
+        'variatie_cos_pct': None if variatie_cos_pct is None else variatie_cos_pct.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
+    }
+
+
+def obtine_household_summary(utilizator):
+    membership = HouseholdMember.objects.filter(
+        utilizator=utilizator,
+        activ=True,
+    ).select_related('household').first()
+    if not membership:
+        return None
+
+    household = membership.household
+    membri = list(household.membri.filter(activ=True).select_related('utilizator'))
+    member_ids = [item.utilizator_id for item in membri]
+
+    azi = timezone.localdate()
+    total_luna = Cheltuiala.objects.filter(
+        utilizator_id__in=member_ids,
+        data__month=azi.month,
+        data__year=azi.year,
+    ).aggregate(total=Sum('suma'))['total'] or Decimal('0')
+
+    return {
+        'household': household,
+        'rol_curent': membership.rol,
+        'membri_count': len(membri),
+        'total_luna': rotunjeste_bani(total_luna),
+    }
+
+
 def detecteaza_recurente(utilizator, azi):
     inceput_istoric = azi - timedelta(days=210)
     cheltuieli_istorice = Cheltuiala.objects.filter(
@@ -351,13 +777,26 @@ def calculate_forecasts(utilizator):
         procent_folosit = (total_cheltuit / suma_limita) * Decimal('100')
         procent_text = procent_folosit.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)
         suma_ramasa = rotunjeste_bani(max(suma_limita - total_cheltuit, Decimal('0')))
+        zile_pana_depasire = calculeaza_zile_pana_depasire(
+            suma_limita=suma_limita,
+            total_cheltuit=total_cheltuit,
+            ritm_zilnic=ritm_zilnic,
+            zile_ramase_luna=zile_ramase_luna,
+        )
 
         suma_depasire = rotunjeste_bani(max(proiectie_luna - suma_limita, Decimal('0')))
         if suma_depasire > 0:
-            mesaj = (
-                f"La ritmul actual, vei depăși bugetul de {rotunjeste_bani(suma_limita)} RON pentru "
-                f"{buget.categorie.nume} cu aproximativ {suma_depasire} RON până la sfârșitul lunii."
-            )
+            if zile_pana_depasire is not None:
+                mesaj = (
+                    f"La ritmul actual, vei depăși bugetul pentru {buget.categorie.nume} în aproximativ "
+                    f"{zile_pana_depasire} zile. Depășirea estimată până la finalul lunii este de "
+                    f"{suma_depasire} RON."
+                )
+            else:
+                mesaj = (
+                    f"La ritmul actual, vei depăși bugetul de {rotunjeste_bani(suma_limita)} RON pentru "
+                    f"{buget.categorie.nume} cu aproximativ {suma_depasire} RON până la sfârșitul lunii."
+                )
             actiune = (
                 f"Intră pe cheltuielile din {buget.categorie.nume} și prioritizează doar costurile "
                 "esențiale pentru restul lunii."
@@ -368,7 +807,7 @@ def calculate_forecasts(utilizator):
                 tip='depasire_iminenta',
                 mesaj=mesaj,
                 suma_implicata=suma_depasire,
-                zile_ramase=zile_ramase_luna,
+                zile_ramase=zile_pana_depasire if zile_pana_depasire is not None else zile_ramase_luna,
                 actiune_recomandata=actiune,
             )
             continue
@@ -416,6 +855,7 @@ def calculate_forecasts(utilizator):
                 )
 
     detecteaza_recurente(utilizator, azi)
+    evalueaza_subscription_radar_avansat(utilizator, azi=azi)
 
     return list(
         ForecastAlert.objects.filter(utilizator=utilizator, citita=False)
@@ -482,6 +922,121 @@ def notifica_milestone_goal(goal, procent_inainte, procent_dupa):
                 zile_ramase=zile_ramase,
                 actiune_recomandata=actiune,
             )
+
+
+def obtine_onboarding_context(utilizator):
+    journey, _ = OnboardingJourney.objects.get_or_create(utilizator=utilizator)
+
+    try:
+        profil = utilizator.userprofile
+        profil_complet = bool(
+            profil.tip_gospodarie and
+            profil.obiectiv and
+            profil.nr_persoane >= 1 and
+            profil.venit_lunar is not None
+        )
+    except UserProfile.DoesNotExist:
+        profil_complet = False
+
+    pasi = [
+        {
+            'key': 'profil',
+            'titlu': 'Completează profilul financiar',
+            'descriere': 'Adaugă venit, tipul gospodăriei și obiectivul financiar.',
+            'done': profil_complet,
+            'url_name': 'profil',
+        },
+        {
+            'key': 'buget',
+            'titlu': 'Setează primul buget',
+            'descriere': 'Definirea unui buget activează alertele predictive.',
+            'done': Budget.objects.filter(utilizator=utilizator).exists(),
+            'url_name': 'adauga_buget',
+        },
+        {
+            'key': 'scan',
+            'titlu': 'Scanează primul bon',
+            'descriere': 'OCR-ul îți alimentează automat istoricul de cheltuieli.',
+            'done': ScanareLog.objects.filter(utilizator=utilizator).exists(),
+            'url_name': 'scaneaza_bon',
+        },
+        {
+            'key': 'goal',
+            'titlu': 'Creează un savings goal',
+            'descriere': 'Setează o țintă ca să vezi progresul săptămânal.',
+            'done': SavingsGoal.objects.filter(utilizator=utilizator).exists(),
+            'url_name': 'adauga_goal',
+        },
+        {
+            'key': 'subscription',
+            'titlu': 'Adaugă un abonament recurent',
+            'descriere': 'Subscription Radar poate preveni scurgerile de bani lunare.',
+            'done': Subscription.objects.filter(utilizator=utilizator).exists(),
+            'url_name': 'lista_subscriptions',
+        },
+    ]
+
+    total_pasi = len(pasi)
+    pasi_completati = sum(1 for pas in pasi if pas['done'])
+    progres_pct = int((pasi_completati / total_pasi) * 100) if total_pasi else 0
+
+    azi = timezone.localdate()
+    if journey.data_tinta and journey.data_tinta < journey.data_start:
+        journey.data_tinta = journey.data_start + timedelta(days=7)
+        journey.save(update_fields=['data_tinta'])
+
+    zile_ramase = None
+    if journey.data_tinta:
+        zile_ramase = (journey.data_tinta - azi).days
+
+    if pasi_completati >= 3 and not journey.first_win_obtinut:
+        journey.first_win_obtinut = True
+        journey.first_win_la = timezone.now()
+        journey.save(update_fields=['first_win_obtinut', 'first_win_la'])
+
+    pending_onboarding_action = SmartAction.objects.filter(
+        utilizator=utilizator,
+        tip='onboarding',
+        status='pending',
+    ).order_by('creat_la').first()
+
+    if not journey.first_win_obtinut and not journey.ascuns:
+        urmatorul_pas = next((pas for pas in pasi if not pas['done']), None)
+        if urmatorul_pas:
+            titlu = f"Onboarding: {urmatorul_pas['titlu']}"
+            descriere = urmatorul_pas['descriere']
+            if pending_onboarding_action:
+                if pending_onboarding_action.titlu != titlu or pending_onboarding_action.descriere != descriere:
+                    pending_onboarding_action.titlu = titlu
+                    pending_onboarding_action.descriere = descriere
+                    pending_onboarding_action.data_scadenta = journey.data_tinta
+                    pending_onboarding_action.save(update_fields=['titlu', 'descriere', 'data_scadenta'])
+            else:
+                SmartAction.objects.create(
+                    utilizator=utilizator,
+                    titlu=titlu,
+                    descriere=descriere,
+                    tip='onboarding',
+                    status='pending',
+                    impact_estimat=Decimal('0'),
+                    data_scadenta=journey.data_tinta,
+                )
+    else:
+        SmartAction.objects.filter(
+            utilizator=utilizator,
+            tip='onboarding',
+            status='pending',
+        ).update(status='done', completata_la=timezone.now())
+
+    return {
+        'journey': journey,
+        'pasi': pasi,
+        'pasi_completati': pasi_completati,
+        'total_pasi': total_pasi,
+        'progres_pct': progres_pct,
+        'zile_ramase': zile_ramase,
+        'afiseaza_card': (not journey.ascuns and not journey.first_win_obtinut),
+    }
 
 
 def obtine_filtre_luna_an(request):
@@ -988,6 +1543,23 @@ def scaneaza_bon(request):
                 data=data_cumpararii,
                 descriere=descriere,
             )
+
+            produse_bon = bon_scan_data.get('produse', []) or []
+            produse_bon = produse_bon if isinstance(produse_bon, list) else []
+            nr_produse = len([item for item in produse_bon if isinstance(item, dict)])
+            pret_mediu_produs = rotunjeste_bani(suma / Decimal(nr_produse)) if nr_produse > 0 else rotunjeste_bani(suma)
+            magazin_bon = str(bon_scan_data.get('magazin') or titlu or 'Bon scanat').strip()
+
+            ReceiptInsight.objects.create(
+                utilizator=request.user,
+                magazin=magazin_bon[:160],
+                data_bon=data_cumpararii,
+                total=rotunjeste_bani(suma),
+                nr_produse=nr_produse,
+                pret_mediu_produs=pret_mediu_produs,
+                produse_json=produse_bon,
+            )
+
             sterge_date_bon_din_sesiune(request)
             messages.success(request, f'Cheltuiala "{cheltuiala.titlu}" a fost creată din bon!')
             return redirect('lista_cheltuieli')
@@ -1131,6 +1703,12 @@ def dashboard(request):
         bar_data.append(float(total))
 
     forecast_alerts = calculate_forecasts(request.user)
+    smart_actions = sincronizeaza_smart_actions_din_alerte(request.user)
+    smart_actions_pending = [item for item in smart_actions if item.status == 'pending'][:4]
+    onboarding_context = obtine_onboarding_context(request.user)
+    receipt_intelligence = calculeaza_receipt_intelligence(request.user, azi=azi_data)
+    household_summary = obtine_household_summary(request.user)
+
     goals_active = SavingsGoal.objects.filter(utilizator=request.user, activ=True)
     inceput_saptamana = timezone.localdate() - timedelta(days=6)
     contributii_saptamana = GoalContribution.objects.filter(
@@ -1161,6 +1739,11 @@ def dashboard(request):
         'bar_data': json.dumps(bar_data),
         'luna_curenta': azi.strftime('%B %Y'),
         'forecast_alerts': forecast_alerts,
+        'smart_actions_pending': smart_actions_pending,
+        'smart_actions_total_pending': len([item for item in smart_actions if item.status == 'pending']),
+        'onboarding': onboarding_context,
+        'receipt_intelligence': receipt_intelligence,
+        'household_summary': household_summary,
         'goals_top': goals_top,
         'total_economisit_goals': rotunjeste_bani(total_economisit_goals),
         'goals_active_count': goals_active.count(),
@@ -1301,6 +1884,258 @@ def upgrade_success(request):
             'plan_selectat': plan_selectat,
         },
     )
+
+
+@csrf_exempt
+def stripe_webhook(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_WEBHOOK_SECRET:
+        return JsonResponse({'error': 'Stripe webhook is not configured'}, status=500)
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    payload = request.body
+    signature = request.META.get('HTTP_STRIPE_SIGNATURE', '')
+
+    try:
+        event = stripe.Webhook.construct_event(payload, signature, settings.STRIPE_WEBHOOK_SECRET)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid payload'}, status=400)
+    except stripe.error.SignatureVerificationError:
+        return JsonResponse({'error': 'Invalid signature'}, status=400)
+
+    event_type = event.get('type')
+    data_object = (event.get('data') or {}).get('object', {})
+
+    if event_type == 'checkout.session.completed':
+        metadata = data_object.get('metadata') or {}
+        user_id = metadata.get('user_id')
+        plan_selectat = str(metadata.get('plan', 'pro')).lower()
+        if plan_selectat not in ['pro', 'family']:
+            plan_selectat = 'pro'
+
+        if user_id:
+            user = User.objects.filter(pk=user_id).first()
+            if user:
+                user_plan = obtine_user_plan(user)
+                user_plan.plan = plan_selectat
+                user_plan.activ = True
+                user_plan.data_expirare = timezone.localdate() + timedelta(days=30)
+                user_plan.stripe_customer_id = data_object.get('customer') or user_plan.stripe_customer_id
+                subscription_id = data_object.get('subscription')
+                if isinstance(subscription_id, str):
+                    user_plan.stripe_subscription_id = subscription_id
+                user_plan.save(
+                    update_fields=[
+                        'plan',
+                        'activ',
+                        'data_expirare',
+                        'stripe_customer_id',
+                        'stripe_subscription_id',
+                    ]
+                )
+
+    if event_type in ['customer.subscription.deleted', 'customer.subscription.updated']:
+        subscription_id = data_object.get('id')
+        subscription_status = data_object.get('status')
+        if subscription_id:
+            user_plan = UserPlan.objects.filter(stripe_subscription_id=subscription_id).first()
+            if user_plan and subscription_status in ['canceled', 'unpaid', 'incomplete_expired']:
+                user_plan.plan = 'free'
+                user_plan.activ = True
+                user_plan.data_expirare = None
+                user_plan.save(update_fields=['plan', 'activ', 'data_expirare'])
+
+    return JsonResponse({'status': 'ok'})
+
+
+@login_required
+def lista_smart_actions(request):
+    calculate_forecasts(request.user)
+    obtine_onboarding_context(request.user)
+    actions = sincronizeaza_smart_actions_din_alerte(request.user)
+
+    context = {
+        'actions_pending': [item for item in actions if item.status == 'pending'],
+        'actions_done': [item for item in actions if item.status == 'done'],
+        'actions_dismissed': [item for item in actions if item.status == 'dismissed'],
+        'impact_total_pending': rotunjeste_bani(
+            sum((Decimal(item.impact_estimat or 0) for item in actions if item.status == 'pending'), Decimal('0'))
+        ),
+    }
+    return render(request, 'spndix/smart_actions/lista.html', context)
+
+
+@login_required
+def actualizeaza_smart_action(request, pk, actiune):
+    smart_action = get_object_or_404(SmartAction, pk=pk, utilizator=request.user)
+
+    if request.method == 'POST':
+        if actiune == 'done':
+            smart_action.status = 'done'
+            smart_action.completata_la = timezone.now()
+            smart_action.save(update_fields=['status', 'completata_la'])
+            messages.success(request, 'Smart action marcat ca finalizat.')
+        elif actiune == 'dismiss':
+            smart_action.status = 'dismissed'
+            smart_action.save(update_fields=['status'])
+            messages.info(request, 'Smart action marcat ca ignorat.')
+        elif actiune == 'reopen':
+            smart_action.status = 'pending'
+            smart_action.completata_la = None
+            smart_action.save(update_fields=['status', 'completata_la'])
+            messages.success(request, 'Smart action reactivat.')
+
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url:
+        return redirect(next_url)
+    return redirect('lista_smart_actions')
+
+
+@login_required
+def onboarding(request):
+    onboarding_context = obtine_onboarding_context(request.user)
+    journey = onboarding_context['journey']
+
+    if request.method == 'POST':
+        actiune = request.POST.get('action')
+        if actiune == 'ascunde':
+            journey.ascuns = True
+            journey.save(update_fields=['ascuns'])
+            messages.info(request, 'Onboarding ascuns. Îl poți reactiva oricând.')
+            return redirect('dashboard')
+        if actiune == 'reactiveaza':
+            journey.ascuns = False
+            journey.save(update_fields=['ascuns'])
+            messages.success(request, 'Onboarding reactivat.')
+            return redirect('onboarding')
+
+    onboarding_context = obtine_onboarding_context(request.user)
+    return render(request, 'spndix/onboarding.html', {'onboarding': onboarding_context})
+
+
+@login_required
+def household(request):
+    membership = HouseholdMember.objects.filter(
+        utilizator=request.user,
+        activ=True,
+    ).select_related('household').first()
+    household_curenta = membership.household if membership else None
+
+    create_form = HouseholdCreateForm(prefix='create')
+    add_member_form = HouseholdAddMemberForm(prefix='member')
+
+    if request.method == 'POST':
+        actiune = request.POST.get('action')
+
+        if actiune == 'create':
+            create_form = HouseholdCreateForm(request.POST, prefix='create')
+            if create_form.is_valid():
+                nume = create_form.cleaned_data['nume'].strip()
+                household_nou = Household.objects.create(
+                    nume=nume,
+                    owner=request.user,
+                )
+                HouseholdMember.objects.create(
+                    household=household_nou,
+                    utilizator=request.user,
+                    rol='owner',
+                    responsabilitate='Coordonare buget',
+                )
+                messages.success(request, f"Gospodăria '{nume}' a fost creată.")
+                return redirect('household')
+
+        if actiune == 'add_member':
+            if not household_curenta or household_curenta.owner_id != request.user.id:
+                messages.error(request, 'Doar owner-ul gospodăriei poate adăuga membri.')
+                return redirect('household')
+
+            add_member_form = HouseholdAddMemberForm(request.POST, prefix='member')
+            if add_member_form.is_valid():
+                username = add_member_form.cleaned_data['username']
+                rol = add_member_form.cleaned_data['rol']
+                responsabilitate = add_member_form.cleaned_data['responsabilitate']
+                user_nou = User.objects.filter(username=username).first()
+
+                if not user_nou:
+                    messages.error(request, 'Utilizatorul nu există.')
+                    return redirect('household')
+
+                HouseholdMember.objects.update_or_create(
+                    household=household_curenta,
+                    utilizator=user_nou,
+                    defaults={
+                        'rol': rol,
+                        'responsabilitate': responsabilitate,
+                        'activ': True,
+                    },
+                )
+                messages.success(request, f"Utilizatorul {username} a fost adăugat în gospodărie.")
+                return redirect('household')
+
+        if actiune == 'remove_member' and household_curenta and household_curenta.owner_id == request.user.id:
+            member_id = request.POST.get('member_id')
+            membru = HouseholdMember.objects.filter(pk=member_id, household=household_curenta, activ=True).first()
+            if membru:
+                if membru.utilizator_id == request.user.id:
+                    messages.error(request, 'Owner-ul nu poate fi eliminat din propria gospodărie.')
+                else:
+                    membru.activ = False
+                    membru.save(update_fields=['activ'])
+                    messages.success(request, f"{membru.utilizator.username} a fost scos din gospodărie.")
+            return redirect('household')
+
+        if actiune == 'leave' and membership and membership.rol != 'owner':
+            membership.activ = False
+            membership.save(update_fields=['activ'])
+            messages.success(request, 'Ai ieșit din gospodărie.')
+            return redirect('household')
+
+    membership = HouseholdMember.objects.filter(
+        utilizator=request.user,
+        activ=True,
+    ).select_related('household').first()
+    household_curenta = membership.household if membership else None
+
+    membri_household = []
+    cheltuieli_membri = []
+    stats_household = None
+    if household_curenta:
+        membri_household = list(
+            household_curenta.membri.filter(activ=True)
+            .select_related('utilizator')
+            .order_by('rol', 'utilizator__username')
+        )
+        member_ids = [item.utilizator_id for item in membri_household]
+        azi = timezone.localdate()
+        cheltuieli_membri = list(
+            Cheltuiala.objects.filter(
+                utilizator_id__in=member_ids,
+                data__month=azi.month,
+                data__year=azi.year,
+            )
+            .values('utilizator__username')
+            .annotate(total=Sum('suma'))
+            .order_by('-total')
+        )
+        total_luna = sum((Decimal(item['total'] or 0) for item in cheltuieli_membri), Decimal('0'))
+        stats_household = {
+            'membri_count': len(membri_household),
+            'total_luna': rotunjeste_bani(total_luna),
+        }
+
+    context = {
+        'membership': membership,
+        'household_curenta': household_curenta,
+        'membri_household': membri_household,
+        'cheltuieli_membri': cheltuieli_membri,
+        'stats_household': stats_household,
+        'create_form': create_form,
+        'add_member_form': add_member_form,
+        'este_owner': bool(household_curenta and household_curenta.owner_id == request.user.id),
+    }
+    return render(request, 'spndix/household.html', context)
 
 
 @login_required

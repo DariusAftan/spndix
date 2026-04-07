@@ -1,0 +1,140 @@
+{% extends 'spndix/base.html' %}
+
+{% block titlu %}Household - Spndix{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-people me-2"></i>Household Mode</h2>
+        <p class="text-body-secondary mb-0">Buget comun pentru cuplu/familie, cu roluri și responsabilități.</p>
+    </div>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-dark">
+        <i class="bi bi-arrow-left me-1"></i>Înapoi la dashboard
+    </a>
+</div>
+
+{% if not household_curenta %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-transparent border-0 pt-3 px-3 fw-semibold">Creează o gospodărie</div>
+        <div class="card-body pt-0 px-3 pb-3">
+            <form method="post" class="row g-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create">
+                <div class="col-md-8">
+                    <label class="form-label">{{ create_form.nume.label }}</label>
+                    {{ create_form.nume }}
+                    {% if create_form.nume.errors %}
+                        <div class="text-danger small">{{ create_form.nume.errors|join:', ' }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-4 d-grid align-content-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-1"></i>Creează
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% else %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <div class="small text-body-secondary">Gospodăria curentă</div>
+                <div class="fw-semibold fs-4">{{ household_curenta.nume }}</div>
+                {% if stats_household %}
+                    <div class="small text-body-secondary">{{ stats_household.membri_count }} membri · {{ stats_household.total_luna|floatformat:2 }} RON luna curentă</div>
+                {% endif %}
+            </div>
+            <span class="badge bg-secondary">Rolul tău: {{ membership.get_rol_display }}</span>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-transparent border-0 pt-3 px-3 fw-semibold">Membri household</div>
+                <div class="card-body pt-0 px-3 pb-3">
+                    <div class="d-grid gap-2">
+                        {% for membru in membri_household %}
+                            <div class="border rounded-3 p-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <div class="fw-semibold">{{ membru.utilizator.username }} · {{ membru.get_rol_display }}</div>
+                                    {% if membru.responsabilitate %}
+                                        <div class="small text-body-secondary">Responsabilitate: {{ membru.responsabilitate }}</div>
+                                    {% endif %}
+                                </div>
+                                {% if este_owner and membru.utilizator_id != request.user.id %}
+                                    <form method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="remove_member">
+                                        <input type="hidden" name="member_id" value="{{ membru.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Elimină</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-transparent border-0 pt-3 px-3 fw-semibold">Cheltuieli pe membru (luna curentă)</div>
+                <div class="card-body pt-0 px-3 pb-3">
+                    {% if cheltuieli_membri %}
+                        <div class="d-grid gap-2">
+                            {% for item in cheltuieli_membri %}
+                                <div class="border rounded-3 p-2 d-flex justify-content-between align-items-center">
+                                    <div>{{ item.utilizator__username }}</div>
+                                    <div class="fw-semibold">{{ item.total|floatformat:2 }} RON</div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-body-secondary small">Nu există cheltuieli pe membrii household în luna curentă.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if este_owner %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-transparent border-0 pt-3 px-3 fw-semibold">Adaugă membru</div>
+            <div class="card-body pt-0 px-3 pb-3">
+                <form method="post" class="row g-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_member">
+                    <div class="col-md-4">
+                        <label class="form-label">{{ add_member_form.username.label }}</label>
+                        {{ add_member_form.username }}
+                        {% if add_member_form.username.errors %}
+                            <div class="text-danger small">{{ add_member_form.username.errors|join:', ' }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ add_member_form.rol.label }}</label>
+                        {{ add_member_form.rol }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ add_member_form.responsabilitate.label }}</label>
+                        {{ add_member_form.responsabilitate }}
+                    </div>
+                    <div class="col-md-2 d-grid align-content-end">
+                        <button type="submit" class="btn btn-primary">Adaugă</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% elif membership.rol != 'owner' %}
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="leave">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-box-arrow-right me-1"></i>Părăsește household
+            </button>
+        </form>
+    {% endif %}
+{% endif %}
+{% endblock %}

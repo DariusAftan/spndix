@@ -10,6 +10,7 @@
         <p class="text-body-secondary mb-4">
             Contul tău a fost actualizat la planul
             <span class="badge text-bg-primary">{{ plan_selectat|title }}</span>.
+            Vei fi redirecționat automat către Dashboard în câteva secunde.
         </p>
         <div class="d-flex justify-content-center gap-2 flex-wrap">
             <a href="{% url 'dashboard' %}" class="btn btn-primary">
@@ -21,4 +22,12 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    setTimeout(function () {
+        window.location.href = "{% url 'dashboard' %}";
+    }, 3000);
+</script>
 {% endblock %}

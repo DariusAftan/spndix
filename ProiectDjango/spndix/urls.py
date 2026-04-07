@@ -3,6 +3,10 @@ from . import views
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    path('onboarding/', views.onboarding, name='onboarding'),
+    path('smart-actions/', views.lista_smart_actions, name='lista_smart_actions'),
+    path('smart-actions/<int:pk>/<str:actiune>/', views.actualizeaza_smart_action, name='actualizeaza_smart_action'),
+    path('household/', views.household, name='household'),
     path('cheltuieli/', views.lista_cheltuieli, name='lista_cheltuieli'),
     path('cheltuieli/export/excel/', views.export_cheltuieli_excel, name='export_cheltuieli_excel'),
     path('cheltuieli/export/pdf/', views.export_cheltuieli_pdf, name='export_cheltuieli_pdf'),
@@ -10,6 +14,7 @@ urlpatterns = [
     path('upgrade/', views.upgrade, name='upgrade'),
     path('checkout/<str:plan>/', views.checkout, name='checkout'),
     path('upgrade/success/', views.upgrade_success, name='upgrade_success'),
+    path('stripe/webhook/', views.stripe_webhook, name='stripe_webhook'),
     path('alerte/citita/<int:pk>/', views.marca_citita, name='marca_citita'),
     path('scaneaza-bon/', views.scaneaza_bon, name='scaneaza_bon'),
     path('goals/', views.lista_goals, name='lista_goals'),

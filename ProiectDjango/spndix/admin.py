@@ -11,6 +11,11 @@ from .models import (
     ScanareLog,
     Subscription,
     UserPlan,
+    Household,
+    HouseholdMember,
+    OnboardingJourney,
+    SmartAction,
+    ReceiptInsight,
 )
 
 
@@ -97,3 +102,38 @@ class ScanareLogAdmin(admin.ModelAdmin):
     list_display = ('utilizator', 'creat_la')
     list_filter = ('creat_la',)
     search_fields = ('utilizator__username',)
+
+
+@admin.register(Household)
+class HouseholdAdmin(admin.ModelAdmin):
+    list_display = ('nume', 'owner', 'creat_la')
+    list_filter = ('creat_la',)
+    search_fields = ('nume', 'owner__username')
+
+
+@admin.register(HouseholdMember)
+class HouseholdMemberAdmin(admin.ModelAdmin):
+    list_display = ('household', 'utilizator', 'rol', 'activ', 'responsabilitate')
+    list_filter = ('rol', 'activ', 'household')
+    search_fields = ('household__nume', 'utilizator__username', 'responsabilitate')
+
+
+@admin.register(OnboardingJourney)
+class OnboardingJourneyAdmin(admin.ModelAdmin):
+    list_display = ('utilizator', 'data_start', 'data_tinta', 'first_win_obtinut', 'ascuns')
+    list_filter = ('first_win_obtinut', 'ascuns')
+    search_fields = ('utilizator__username',)
+
+
+@admin.register(SmartAction)
+class SmartActionAdmin(admin.ModelAdmin):
+    list_display = ('utilizator', 'titlu', 'tip', 'status', 'impact_estimat', 'data_scadenta')
+    list_filter = ('tip', 'status', 'data_scadenta')
+    search_fields = ('utilizator__username', 'titlu', 'descriere')
+
+
+@admin.register(ReceiptInsight)
+class ReceiptInsightAdmin(admin.ModelAdmin):
+    list_display = ('utilizator', 'magazin', 'data_bon', 'total', 'nr_produse', 'pret_mediu_produs')
+    list_filter = ('magazin', 'data_bon')
+    search_fields = ('utilizator__username', 'magazin')

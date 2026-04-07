@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
+from datetime import timedelta
 
 
 LUNA_CHOICES = [
@@ -49,6 +51,8 @@ TIP_ALERTA_CHOICES = [
     ('economie_posibila', 'Economie posibilă'),
     ('recurenta_detectata', 'Recurență detectată'),
     ('abonament_iminent', 'Abonament iminent'),
+    ('abonament_scumpit', 'Abonament scumpit'),
+    ('sugestie_anulare', 'Sugestie anulare'),
 ]
 
 
@@ -56,6 +60,28 @@ FRECVENTA_SUBSCRIPTION_CHOICES = [
     ('lunar', 'Lunar'),
     ('anual', 'Anual'),
     ('saptamanal', 'Săptămânal'),
+]
+
+
+ROL_MEMBRU_GOSPODARIE_CHOICES = [
+    ('owner', 'Owner'),
+    ('adult', 'Adult'),
+    ('copil', 'Copil'),
+]
+
+
+TIP_SMART_ACTION_CHOICES = [
+    ('buget', 'Buget'),
+    ('abonament', 'Abonament'),
+    ('economii', 'Economii'),
+    ('onboarding', 'Onboarding'),
+]
+
+
+STATUS_SMART_ACTION_CHOICES = [
+    ('pending', 'În așteptare'),
+    ('done', 'Finalizat'),
+    ('dismissed', 'Ignorat'),
 ]
 
 
@@ -286,3 +312,118 @@ class Subscription(models.Model):
         verbose_name = 'Abonament'
         verbose_name_plural = 'Abonamente'
         ordering = ['-activ', 'urmatoarea_plata', 'nume']
+
+
+class Household(models.Model):
+    nume = models.CharField(max_length=120)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='households_owned')
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.nume} ({self.owner.username})"
+
+    class Meta:
+        verbose_name = 'Gospodărie'
+        verbose_name_plural = 'Gospodării'
+        ordering = ['-creat_la']
+
+
+class HouseholdMember(models.Model):
+    household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name='membri')
+    utilizator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='household_memberships')
+    rol = models.CharField(max_length=20, choices=ROL_MEMBRU_GOSPODARIE_CHOICES, default='adult')
+    responsabilitate = models.CharField(max_length=200, blank=True)
+    activ = models.BooleanField(default=True)
+    adaugat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.household.nume} - {self.utilizator.username} ({self.get_rol_display()})"
+
+    class Meta:
+        verbose_name = 'Membru gospodărie'
+        verbose_name_plural = 'Membri gospodărie'
+        ordering = ['household__nume', 'utilizator__username']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['household', 'utilizator'],
+                name='unique_household_member',
+            )
+        ]
+
+
+class OnboardingJourney(models.Model):
+    utilizator = models.OneToOneField(User, on_delete=models.CASCADE, related_name='onboarding_journey')
+    data_start = models.DateField(default=timezone.localdate)
+    data_tinta = models.DateField(null=True, blank=True)
+    first_win_obtinut = models.BooleanField(default=False)
+    first_win_la = models.DateTimeField(null=True, blank=True)
+    ascuns = models.BooleanField(default=False)
+    creat_la = models.DateTimeField(auto_now_add=True)
+    actualizat_la = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.data_tinta:
+            self.data_tinta = self.data_start + timedelta(days=7)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Onboarding {self.utilizator.username}"
+
+    class Meta:
+        verbose_name = 'Onboarding'
+        verbose_name_plural = 'Onboarding'
+
+
+@receiver(post_save, sender=User)
+def create_onboarding_journey(sender, instance, created, **kwargs):
+    if created:
+        OnboardingJourney.objects.create(utilizator=instance)
+
+
+class SmartAction(models.Model):
+    utilizator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='smart_actions')
+    alerta = models.OneToOneField(
+        ForecastAlert,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='smart_action',
+    )
+    titlu = models.CharField(max_length=220)
+    descriere = models.TextField(blank=True)
+    tip = models.CharField(max_length=20, choices=TIP_SMART_ACTION_CHOICES, default='buget')
+    status = models.CharField(max_length=20, choices=STATUS_SMART_ACTION_CHOICES, default='pending')
+    impact_estimat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    data_scadenta = models.DateField(null=True, blank=True)
+    completata_la = models.DateTimeField(null=True, blank=True)
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.utilizator.username} - {self.titlu}"
+
+    class Meta:
+        verbose_name = 'Smart action'
+        verbose_name_plural = 'Smart actions'
+        ordering = ['status', 'data_scadenta', '-creat_la']
+
+
+class ReceiptInsight(models.Model):
+    utilizator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='receipt_insights')
+    magazin = models.CharField(max_length=160)
+    data_bon = models.DateField()
+    total = models.DecimalField(max_digits=12, decimal_places=2)
+    nr_produse = models.PositiveIntegerField(default=0)
+    pret_mediu_produs = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    produse_json = models.JSONField(default=list, blank=True)
+    creat_la = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.utilizator.username} - {self.magazin} - {self.total}"
+
+    class Meta:
+        verbose_name = 'Receipt insight'
+        verbose_name_plural = 'Receipt insights'
+        ordering = ['-data_bon', '-creat_la']
+        indexes = [
+            models.Index(fields=['utilizator', 'data_bon']),
+        ]

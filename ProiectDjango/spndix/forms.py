@@ -8,6 +8,7 @@ from .models import (
     SavingsGoal,
     GoalContribution,
     Subscription,
+    HouseholdMember,
 )
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
@@ -113,3 +114,36 @@ class SubscriptionForm(forms.ModelForm):
         labels = {
             'ziua_lunii': 'Ziua debitării',
         }
+
+
+class HouseholdCreateForm(forms.Form):
+    nume = forms.CharField(
+        max_length=120,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Familia Popescu'}),
+        label='Nume gospodărie',
+    )
+
+
+class HouseholdAddMemberForm(forms.Form):
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'username existent'}),
+        label='Username membru',
+    )
+    rol = forms.ChoiceField(
+        choices=HouseholdMember._meta.get_field('rol').choices,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Rol',
+    )
+    responsabilitate = forms.CharField(
+        required=False,
+        max_length=200,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: utilități'}),
+        label='Responsabilitate',
+    )
+
+    def clean_username(self):
+        username = (self.cleaned_data.get('username') or '').strip()
+        if not User.objects.filter(username=username).exists():
+            raise forms.ValidationError('Nu există utilizator cu acest username.')
+        return username

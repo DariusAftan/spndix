@@ -1,0 +1,81 @@
+{% extends 'spndix/base.html' %}
+
+{% block titlu %}Onboarding - Spndix{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-signpost-2 me-2"></i>Onboarding 7 zile</h2>
+        <p class="text-body-secondary mb-0">Ținta: primul win financiar rapid prin pași practici.</p>
+    </div>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-dark">
+        <i class="bi bi-arrow-left me-1"></i>Înapoi la dashboard
+    </a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="fw-semibold">Progres onboarding</div>
+            <div class="small text-body-secondary">{{ onboarding.pasi_completati }} / {{ onboarding.total_pasi }} pași</div>
+        </div>
+        <div class="progress mb-2" style="height: 10px;">
+            <div class="progress-bar" role="progressbar" style="width: {{ onboarding.progres_pct }}%;"></div>
+        </div>
+        <div class="small text-body-secondary">
+            {% if onboarding.zile_ramase is not None %}
+                Mai ai {{ onboarding.zile_ramase }} zile până la ținta inițială de onboarding.
+            {% endif %}
+            {% if onboarding.journey.first_win_obtinut %}
+                Primul win financiar este deja atins. Excelent!
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-transparent border-0 pt-3 px-3 fw-semibold">Checklist</div>
+    <div class="card-body pt-0 px-3 pb-3">
+        <div class="d-grid gap-2">
+            {% for pas in onboarding.pasi %}
+                <div class="border rounded-3 p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="fw-semibold">
+                            {% if pas.done %}
+                                <i class="bi bi-check-circle-fill text-success me-1"></i>
+                            {% else %}
+                                <i class="bi bi-circle text-body-secondary me-1"></i>
+                            {% endif %}
+                            {{ pas.titlu }}
+                        </div>
+                        <div class="small text-body-secondary">{{ pas.descriere }}</div>
+                    </div>
+                    <a href="{% url pas.url_name %}" class="btn btn-sm {% if pas.done %}btn-outline-success{% else %}btn-outline-primary{% endif %}">
+                        {% if pas.done %}Revizuiește{% else %}Completează{% endif %}
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="d-flex gap-2 flex-wrap">
+    {% if onboarding.journey.ascuns %}
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reactiveaza">
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="bi bi-eye me-1"></i>Reactivează onboarding
+            </button>
+        </form>
+    {% else %}
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="ascunde">
+            <button type="submit" class="btn btn-outline-secondary">
+                <i class="bi bi-eye-slash me-1"></i>Ascunde onboarding
+            </button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}
